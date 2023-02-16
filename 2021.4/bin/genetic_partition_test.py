@@ -768,6 +768,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 	in_nodes, out_nodes, nonprimitives  = get_nonprimitive_nodes (G)
 
+	# if only partition the middle nodes, remove the input and output nodes from the graph
 	if primitive_only == 'TRUE':
 		G_primitive = get_G_primitive (G, nonprimitives)
 	else:
@@ -787,9 +788,10 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	partList = [get_part(partDict, n) for n in list(G_nodes)]
 	matrix, partG = partition_matrix (G_primitive, partList)
 
-	# print('original partition', partDict)
-	# print('nodes', list(G_nodes))
-	# print('matrix of original partition', matrix)
+	print('original partition', partDict)
+	print('List', partList)
+	print('nodes', list(G_nodes))
+	print('matrix of original partition', matrix)
 	loop_free_o, motif_allowed_o = check_constraint (matrix, partG, motif_constraint)
 	# print('initial partition loop free', loop_free_o)
 	# print('initial partition motif allowed', motif_allowed_o)

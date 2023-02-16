@@ -7,12 +7,17 @@
 
 # Supporting modules
 import argparse
-import genetic_partition_test as gp 
+import genetic_partition_test as gp
 import os
 import shutil
+import csv
 import copy
+import time
+
 
 def main():
+
+	start = time.time()
 
 	# Parse the command line inputs
 	parser = argparse.ArgumentParser(description="perform graph partition using metis")
@@ -57,7 +62,8 @@ def main():
 
 		if target_n == ['']:  # if user doesn't supply a target number that the graph should be partitioned into 
 			nparts = list(range(int(len(G_primitive.nodes())/max_nodes)+1, int(len(G_primitive.nodes())/min_nodes)+1))
-			for n in nparts[0:20]: 
+			# decide how many nparts folders to be created, we can set [start: end] to have faster searching
+			for n in nparts:
 				print('Partitioning graph into ', n, ' parts')
 				outdir   = out_path + '/nparts/' + str(n)
 				if os.path.exists(outdir) == False:
@@ -71,9 +77,16 @@ def main():
 				part_opt = gp.partition_nparts_wrapper (G_primitive, int(n), out_path+'/nparts/'+ n)
 				# gp.visualize_assignment_graphviz (DAG, part_opt, nonprimitives, primitive_only, out_path+'/nparts/'+n, 0)
 
+		end = time.time()
+		runtime = end - start
+		PATH = '/home/cidar-lab/genetic-circuit-partitioning/2021.4'
+		outcsvpath = f"{PATH}/runs/results/4-input-boolean-circuits/metis_time.csv"
+		with open(outcsvpath, 'a', newline='') as f:
+			fieldnames = ['ID', 'runtime']
+			writer = csv.DictWriter(f, fieldnames=fieldnames)
+			writer.writerow({'ID': s, 'runtime': runtime})
+
 
 if __name__ == "__main__":
 	main()
 
-
-	

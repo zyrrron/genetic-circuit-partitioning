@@ -8,6 +8,7 @@ import matplotlib.ticker as mticker
 import csv
 import numpy as np
 import genetic_partition_test as gp
+import pandas as pd
 import itertools
 from networkx.drawing.nx_agraph import graphviz_layout
 import matplotlib.image as mpimg
@@ -1171,13 +1172,31 @@ def plot_histogram() :
 	plt.show()
 
 
+def collect_nodes_num(Path, dir, dirr):
+	dir1 = Path + dir + dirr
+	count1, benchmarks_name = [], []
+	for benchmark in os.listdir(dir1):
+		if not benchmark.startswith('.'):
+			edgelist1 = dir1 + '/' + benchmark + '/DAG.edgelist'
+			if os.path.exists(edgelist1):
+				node_number1 = get_node_number(edgelist1)
+				count1.append(node_number1)
+				benchmarks_name.append(benchmark)
+
+	dictionary = dict(zip(benchmarks_name, count1))
+	outcsvpath = f"{Path}/runs/results/nodes_info/{dirr}.csv"
+	with open(outcsvpath, 'w', newline='') as f:
+		dataframe = pd.DataFrame.from_dict(dictionary, orient='index', columns=["node number"])
+		dataframe.to_csv(outcsvpath)
+
 
 if __name__ == '__main__':
-	PATH = '/home/ubuntu/genetic-circuit-partitioning/2021.4/'
+	PATH = '/home/cidar-lab/genetic-circuit-partitioning/2021.4'
 	# PATH = '/Users/jgzhang/Work/Densmore_lab/Partition/code_version/v2/genetic-circuit-partitioning/2021.4/'
-	
 
-	# count_nodes (PATH + 'runs/results/4-input-boolean-circuits', PATH + 'runs/results/5-input-boolean-circuits')
+	# count_nodes (PATH + '/runs/results/4-input-boolean-circuits', PATH + '/runs/results/5-input-boolean-circuits')
+	# collect_nodes_num(PATH, '/runs/benchmark/', '8-input-boolean-circuits')
+	collect_nodes_num(PATH, '/runs/benchmark/', 'electronic-circuits')
 	# partition_stats ()
 	# compile_best_solutions ()
 	# plot_timestep ()
@@ -1194,7 +1213,7 @@ if __name__ == '__main__':
 	# print(avgNode)
 	# partition = generate_edgelist_of_cells (PATH)
 	# converted_names = convert_name (PATH + 'runs/results/electronic-circuits/md5Core/Jai_solution/gate_name_conversion.txt')
-	visualize_subnetworks_unmet_constraint (PATH, 'lc')
+	# visualize_subnetworks_unmet_constraint (PATH, 'lc')
 	# compare_runs (PATH, 'lc')
 	# compare_gatenum_distribution (PATH, 'lc')
 	# compare_qs_distribution (PATH, 'lc')

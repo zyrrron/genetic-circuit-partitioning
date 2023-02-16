@@ -7,7 +7,7 @@
 
 # Supporting modules
 import argparse
-import genetic_circuit_partition as gp 
+from . import genetic_circuit_partition as gp
 from pycallgraph import PyCallGraph
 from pycallgraph.output import GraphvizOutput
 import os
@@ -119,8 +119,7 @@ def main():
 
 	print('TOTAL execution time', datetime.datetime.now()-begin_time)
 
+
 if __name__ == "__main__":
 	main()
 
-
-	

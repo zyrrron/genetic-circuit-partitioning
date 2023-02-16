@@ -97,6 +97,7 @@ def load_metis_part_sol (inputfile):
 		part = int( tokens[0].split(' ')[-1] )
 		nodes = tokens[1].split(',')
 		partDict[part] = nodes
+	# print(partDict)
 	return cut, partDict
 
 def load_opt_part_sol (inputfile):
@@ -171,8 +172,13 @@ def read_json(inputfile):
 		s = re.search('"direction": "(.*)"', s)
 		direction = s.group(1)
 		ports[el]['direction'] = direction
+		# get offset if it exists
+		s = lines[v + 2].strip()
+		if s[-1] == ',':
+			offset = s.split(':')[1].split(',')[0].strip()
+			ports[el]['offset'] = int(offset)
+			s = lines[v + 3].strip()
 		# get bits
-		s = lines[v+2].strip()
 		bits = s.split('[')[1].split(']')[0].strip()
 		ports[el]['bits'] = int(bits)
 	# get information of gates 
@@ -209,14 +215,13 @@ def synthesize_graph (ports, gates, outdir, t):
 	G = nx.DiGraph()
 	# start from the output, add edges
 	edges = []
-
+	print(gates)
 	for p in ports:
 		if ports[p]['direction'] == 'output':
 			b = ports[p]['bits']
 			for g in gates:
 				if b == gates[g]['output']['Y']:
 					edges.append((g, p))
-					# print('output', (g,p))
 
 	for p in ports:
 		if ports[p]['direction'] == 'input':
@@ -267,7 +272,7 @@ def get_nonprimitive_nodes (G):
 			out_nodes.append(node)
 		if indegree == 0:
 			in_nodes.append(node)
-	nonprimitives = in_nodes + out_nodes 
+	nonprimitives = in_nodes + out_nodes
 	return in_nodes, out_nodes, nonprimitives 
 
 def get_G_primitive (G, nonprimitives): 
@@ -313,6 +318,7 @@ def calc_signal_path (G, in_nodes, out_nodes, partDict):
 							if get_part(partDict, e[0]) != get_part(partDict, e[1]):
 								cross += 1
 					crosslist.append(cross)
+	print(crosslist)
 	return crosslist
 
 def calc_signal_path2 (partG):
@@ -418,7 +424,6 @@ def partition_nparts_wrapper (G, n, outdir):
 		outfile = outdir +'/part_solns.txt'
 		f_out = open(outfile, 'w')
 		f_out.write('cut\t'+str(part_opt[0])+'\n')
-                                                                                                                                  
 		for part in range(max(part_opt[1])+1):
 			nodeIdx = [a for a, b in enumerate(part_opt[1]) if b == part]
 			nodes = [list(G.nodes())[node] for node in nodeIdx] 
@@ -838,21 +843,18 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 						while part_constraint == False:
 							# randomly choose a cell 
 							try: 
-								if random.uniform(0, 1) < 0.2: 
+								if random.uniform(0, 1) < 0.2:
 									cell = random.choice(cell_met_const)
 								else: 
 									cell = random.choice(cell_unmet_const)
 							except IndexError: 
 								cell = random.choice(cell_met_const + cell_unmet_const)
-							# print('choosing cell', cell)
+
 							# generate a subnetwork of this chosen cell and its neighboring cells
 							subG_cells = get_subnetwork (bestmatrix, cell)
-							# print('subgraph cells', subG_cells)
-
 							subG_nodes = list( set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] in subG_cells]) - set(locked_nodes) )
-							# print('nodes in subgraph', subG_nodes)
 							
-							# choose 1 to n (maxNodes) nodes form this pair to swap 
+							# choose 1 to n (maxNodes) nodes from this compartment to shift
 							trial, have_nodes_to_move = 0, False
 							while  have_nodes_to_move == False:
 								try: 
@@ -1099,6 +1101,7 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 									cell = random.choice(cell_met_const)
 								else: 
 									cell = random.choice(cell_unmet_const)
+
 							except IndexError: 
 								cell = random.choice(cell_met_const + cell_unmet_const)
 							# print('choosing cell', cell)

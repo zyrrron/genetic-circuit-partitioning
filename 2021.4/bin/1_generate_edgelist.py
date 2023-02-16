@@ -7,7 +7,7 @@
 
 # Supporting modules
 import argparse
-import genetic_partition as gp 
+import genetic_partition_test as gp
 
 def main():
 
@@ -24,7 +24,7 @@ def main():
 	for s in samples:
 		print('sample ', s)
 		graph_path = settings[s]['graph_path']
-		JSON_file  = graph_path + '/' + s + '.json'
+		JSON_file = graph_path + '/' + s + '.json'
 		# load json file 
 		ports, gates = gp.read_json(JSON_file)
 		gp.synthesize_graph (ports, gates, graph_path, t=10)
@@ -33,5 +33,3 @@ def main():
 if __name__ == "__main__":
 	main()
 
-
-	

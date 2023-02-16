@@ -1,0 +1,9 @@
+cut	13
+Partition 0	801,798,796,802
+Partition 1	797,814,815
+Partition 2	804,813,816
+Partition 3	810,811,803,800
+Partition 4	821,817,818
+Partition 5	823,819,820,822
+Partition 6	808,799,806,807
+Partition 7	824,812,805,809

@@ -1,0 +1,8 @@
+cut	12
+Partition 0	379,385
+Partition 1	390,386
+Partition 2	388,387,381
+Partition 3	395,391
+Partition 4	394,380,393
+Partition 5	392,382,378
+Partition 6	383,389,384

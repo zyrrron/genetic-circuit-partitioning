@@ -1,0 +1,15 @@
+cut	16
+Partition 0	380
+Partition 1	386
+Partition 2	379
+Partition 3	378
+Partition 4	387
+Partition 5	388
+Partition 6	393,389
+Partition 7	392
+Partition 8	390
+Partition 9	391
+Partition 10	383
+Partition 11	382
+Partition 12	381
+Partition 13	384,385

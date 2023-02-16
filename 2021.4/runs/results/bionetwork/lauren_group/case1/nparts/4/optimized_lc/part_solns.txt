@@ -1,0 +1,7 @@
+path	1
+T	NA
+cut	3
+Partition 0	1
+Partition 1	3,2
+Partition 2	4
+Partition 3	6,5

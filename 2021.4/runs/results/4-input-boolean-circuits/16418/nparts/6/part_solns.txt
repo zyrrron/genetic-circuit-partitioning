@@ -1,0 +1,7 @@
+cut	11
+Partition 0	390,388
+Partition 1	394,392,381
+Partition 2	393,378,391
+Partition 3	380,386,387
+Partition 4	384,385,379
+Partition 5	382,383,389

@@ -1,0 +1,9 @@
+cut	8
+Partition 0	2
+Partition 1	5,3
+Partition 2	4
+Partition 3	6
+Partition 4	8
+Partition 5	9,1
+Partition 6	10
+Partition 7	7

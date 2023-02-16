@@ -1,0 +1,11 @@
+cut	11
+Partition 0	out
+Partition 1	6
+Partition 2	5
+Partition 3	2
+Partition 4	c
+Partition 5	4
+Partition 6	a
+Partition 7	b
+Partition 8	3
+Partition 9	1

@@ -796,7 +796,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	# print('motif constraint', motif_constraint)
 	cell_unmet_const_o, cell_met_const_o = get_cells_unmet_constraint (matrix, partG, motif_constraint, loop_free)
 
-	## optimize traverse times 
+	## optimize traverse times
 
 	# make a directory to store results
 	if os.path.exists(outdir):
@@ -830,6 +830,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 			last_updated = 0
 			for t in range(1,int(timestep)):  # timestep
+				if t%10000 == 0: print(t)
 				# at each timestep, choose a swap that satisfies the gate number constraints of each cell 
 				# print('original part dict', partDict)
 				# print('bestpartList', bestpartList)

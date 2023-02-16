@@ -1,7 +1,7 @@
 path	1
 T	NA
-cut	3
+cut	4
 Partition 0	2,5,3
-Partition 1	4
-Partition 2	1
-Partition 3	9,7,10,6,8
+Partition 1	4,6
+Partition 2	7,10
+Partition 3	1,9,8

@@ -131,7 +131,7 @@ def main():
 		gp.determine_best_solution (DAG, primitive_only, high_constraint, low_constraint, outdir)
 		runtime = time.time() - begin_time_current_step
 		PATH = '/home/cidar-lab/genetic-circuit-partitioning/2021.4'
-		outcsvpath = f"{PATH}/runs/results/4-input-boolean-circuits/oriole_time.csv"
+		outcsvpath = f"{PATH}/runs/results/oriole_time.csv"
 		with open(outcsvpath, 'a', newline='') as f:
 			fieldnames = ['ID', 'runtime']
 			writer = csv.DictWriter(f, fieldnames=fieldnames)

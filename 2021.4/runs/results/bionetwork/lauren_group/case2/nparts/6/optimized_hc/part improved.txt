@@ -1,2 +1,2 @@
 iteration	t
-1	530
+1	

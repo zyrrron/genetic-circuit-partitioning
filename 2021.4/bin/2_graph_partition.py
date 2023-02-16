@@ -80,7 +80,7 @@ def main():
 		end = time.time()
 		runtime = end - start
 		PATH = '/home/cidar-lab/genetic-circuit-partitioning/2021.4'
-		outcsvpath = f"{PATH}/runs/results/4-input-boolean-circuits/metis_time.csv"
+		outcsvpath = f"{PATH}/runs/results/metis_time.csv"
 		with open(outcsvpath, 'a', newline='') as f:
 			fieldnames = ['ID', 'runtime']
 			writer = csv.DictWriter(f, fieldnames=fieldnames)

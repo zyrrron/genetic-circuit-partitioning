@@ -851,6 +851,10 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 							except IndexError: 
 								cell = random.choice(cell_met_const + cell_unmet_const)
 
+							# Ron-update
+
+
+
 							# generate a subnetwork of this chosen cell and its neighboring cells
 							subG_cells = get_subnetwork (bestmatrix, cell)
 							subG_nodes = list( set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] in subG_cells]) - set(locked_nodes) )
@@ -1598,17 +1602,18 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 									elif cut == best_soln[0][1][0]:
 										best_soln.append((iteration, part_opt)) 
 
+					#
 					# Ron Update-- reduce duplicate solutions in best_soln.txt
-					print("best soln", best_soln)
+					#
+					# print("best soln", best_soln)
 					reduce_duplicate_set = set()
 					l_set = 0
 					for soln in best_soln:
 						reduce_duplicate_set.add(tuple(soln[1][1]))
-						print("set: ", reduce_duplicate_set)
+						# print("set: ", reduce_duplicate_set)
 						if len(reduce_duplicate_set) == l_set: continue
 						else: l_set += 1
-						print("soln: ", soln)
-						print("soln group: ", soln[1][1])
+
 						# compile results
 						matrix_bs, partG_bs = partition_matrix (G_primitive, soln[1][1])
 						loop_free_bs = check_cycles(partG_bs)

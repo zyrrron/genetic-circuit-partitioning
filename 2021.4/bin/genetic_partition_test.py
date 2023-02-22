@@ -788,10 +788,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	partList = [get_part(partDict, n) for n in list(G_nodes)]
 	matrix, partG = partition_matrix (G_primitive, partList)
 
-	print('original partition', partDict)
-	print('List', partList)
-	print('nodes', list(G_nodes))
-	print('matrix of original partition', matrix)
+	# print('original partition', partDict)
 	loop_free_o, motif_allowed_o = check_constraint (matrix, partG, motif_constraint)
 	# print('initial partition loop free', loop_free_o)
 	# print('initial partition motif allowed', motif_allowed_o)
@@ -832,7 +829,8 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 			last_updated = 0
 			for t in range(1,int(timestep)):  # timestep
-				if t%10000 == 0: print(t)
+				if t % 10000 == 0:
+					print(t)
 				# at each timestep, choose a swap that satisfies the gate number constraints of each cell 
 				# print('original part dict', partDict)
 				# print('bestpartList', bestpartList)
@@ -869,7 +867,6 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 									if trial > 50: break      
 
 							partList_tmp = ujson_copy (bestpartList)
-
 							# print('partList_best', partList_tmp)
 							# partDict_tmp = {int(k):v for k,v in partDict_tmp.items()}
 							# partList_tmp = [get_part(partDict_tmp, n) for n in list(G_nodes)]
@@ -879,9 +876,11 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 							# given certain probability, new cells can be added
 							if len(subG_nodes)/len(subG_cells) >= populate_cell: 
 								new_cell = np.random.poisson(populate_cell_rate)
-								# print('new cells', new_cell)
+								print('new cells', new_cell)
+								print('partList_best', partList_tmp)
+								print('original cells', subG_cells)
 								subG_cells.extend ([max(partList_tmp)+c for c in range(1, new_cell+1)])
-								# print('add new cells', subG_cells)
+								print('add new cells', subG_cells)
 							for node in nodes_to_move:
 								# print('move node', node)
 								node_idx = list(G_nodes).index(node)
@@ -1554,11 +1553,11 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 					matrix_o, partG_o = partition_matrix(G_primitive, part_opt_o[1])
 					motif_allowed_o = check_motif_allowed(matrix_o, motif_constraint)
 					loop_free_o = check_cycles(partG_o)
-					best_soln = [('0', part_opt_o)]
+					best_soln = [(0, part_opt_o)]
 					minT      = T_o
 					# load optimized solution
 					solDict = load_opt_part_sol (outdir+npart+'/optimized_'+constraint+'/part_solns.txt')
-
+					# print("solDict", solDict)
 					# check if motif_constraint is satisfied
 					for iteration in solDict.keys():
 						# print('iteration', iteration)
@@ -1598,9 +1597,18 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 										best_soln = [(iteration, part_opt)]
 									elif cut == best_soln[0][1][0]:
 										best_soln.append((iteration, part_opt)) 
-										# print(best_soln)
 
+					# Ron Update-- reduce duplicate solutions in best_soln.txt
+					print("best soln", best_soln)
+					reduce_duplicate_set = set()
+					l_set = 0
 					for soln in best_soln:
+						reduce_duplicate_set.add(tuple(soln[1][1]))
+						print("set: ", reduce_duplicate_set)
+						if len(reduce_duplicate_set) == l_set: continue
+						else: l_set += 1
+						print("soln: ", soln)
+						print("soln group: ", soln[1][1])
 						# compile results
 						matrix_bs, partG_bs = partition_matrix (G_primitive, soln[1][1])
 						loop_free_bs = check_cycles(partG_bs)

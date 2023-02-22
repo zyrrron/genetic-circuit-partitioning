@@ -1,8 +1,0 @@
-cut	8
-Partition 0	b
-Partition 1	5
-Partition 2	c,2
-Partition 3	6
-Partition 4	a,4
-Partition 5	1,3
-Partition 6	out

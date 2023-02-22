@@ -1,2 +1,2 @@
 iteration	minT
-1	NA,NA,NA
+1	NA,NA

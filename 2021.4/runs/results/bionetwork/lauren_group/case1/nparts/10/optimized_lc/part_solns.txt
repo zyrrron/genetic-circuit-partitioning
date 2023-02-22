@@ -1,9 +1,0 @@
-path	1
-T	NA
-cut	5
-Partition 1	6
-Partition 2	5
-Partition 3	2
-Partition 5	4
-Partition 8	3
-Partition 9	1

@@ -1602,9 +1602,9 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 									elif cut == best_soln[0][1][0]:
 										best_soln.append((iteration, part_opt)) 
 
-					#
+					# # # # # # # # # # # # # # # # #
 					# Ron Update-- reduce duplicate solutions in best_soln.txt
-					#
+					# # # # # # # # # # # # # # # # #
 					# print("best soln", best_soln)
 					reduce_duplicate_set = set()
 					l_set = 0
@@ -1613,6 +1613,7 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 						# print("set: ", reduce_duplicate_set)
 						if len(reduce_duplicate_set) == l_set: continue
 						else: l_set += 1
+						# # # # # # # # # # # # # # # # #
 
 						# compile results
 						matrix_bs, partG_bs = partition_matrix (G_primitive, soln[1][1])

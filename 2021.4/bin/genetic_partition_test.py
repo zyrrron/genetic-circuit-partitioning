@@ -850,10 +850,12 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 									cell = random.choice(cell_unmet_const)
 							except IndexError: 
 								cell = random.choice(cell_met_const + cell_unmet_const)
+							print("cell", cell)
+							# # # # # # # # # # # # # # # # #
+							# Ron-update: from random decision to having heuristic
+							# # # # # # # # # # # # # # # # #
 
-							# Ron-update
-
-
+							# # # # # # # # # # # # # # # # #
 
 							# generate a subnetwork of this chosen cell and its neighboring cells
 							subG_cells = get_subnetwork (bestmatrix, cell)
@@ -1018,10 +1020,10 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 
 def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxNodes, populate_cell, populate_cell_rate, dist_boolean, motif_constraint, loop_free, priority, timestep, trajectories, tot_i, outdir):
-	""" 
-	optimize based on signal travel time from inputs to the output 
-	1. calculate the times that inputs have to traverse cell boundries 
-	2. optmize the max traverse to be as low as possible 
+	"""
+	optimize based on signal travel time from inputs to the output
+	1. calculate the times that inputs have to traverse cell boundries
+	2. optmize the max traverse to be as low as possible
 	"""
 
 	Smin, Smax = int (S_bounds[0]), int (S_bounds[1])
@@ -1039,8 +1041,8 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 	# calculate original signal traverse time
 	if priority == 'T':
 		T = calc_signal_path (G, in_nodes, out_nodes, partDict)
-		minT_o = max(T) 
-	else: 
+		minT_o = max(T)
+	else:
 		minT_o = 'NA'
 	# print(minT)
 	# get original partition matrix
@@ -1056,13 +1058,13 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 	# print('motif constraint', motif_constraint)
 	cell_unmet_const_o, cell_met_const_o = get_cells_unmet_constraint (matrix, partG, motif_constraint, loop_free)
 
-	## optimize traverse times 
+	## optimize traverse times
 
 	# make a directory to store results
 	# if os.path.exists(outdir):
 	# 	shutil.rmtree(outdir)
 	# 	os.mkdir(outdir)
-	# else: 
+	# else:
 	# 	os.mkdir(outdir)
 
 	if len(G_primitive.nodes()) > Smax:
@@ -1090,7 +1092,7 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 
 			last_updated = 0
 			for t in range(1,int(timestep)):  # timestep
-				# at each timestep, choose a swap that satisfies the gate number constraints of each cell 
+				# at each timestep, choose a swap that satisfies the gate number constraints of each cell
 				# print('original part dict', partDict)
 				# print('bestpartList', bestpartList)
 
@@ -1101,14 +1103,14 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 						part_constraint = False
 
 						while part_constraint == False:
-							# randomly choose a cell 
-							try: 
-								if random.uniform(0, 1) < 0.2: 
+							# randomly choose a cell
+							try:
+								if random.uniform(0, 1) < 0.2:
 									cell = random.choice(cell_met_const)
-								else: 
+								else:
 									cell = random.choice(cell_unmet_const)
 
-							except IndexError: 
+							except IndexError:
 								cell = random.choice(cell_met_const + cell_unmet_const)
 							# print('choosing cell', cell)
 							# generate a subnetwork of this chosen cell and its neighboring cells
@@ -1117,17 +1119,17 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 
 							subG_nodes = list( set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] in subG_cells]) - set(locked_nodes) )
 							# print('nodes in subgraph', subG_nodes)
-							
-							# choose 1 to n (maxNodes) nodes form this pair to swap 
+
+							# choose 1 to n (maxNodes) nodes form this pair to swap
 							trial, have_nodes_to_move = 0, False
 							while  have_nodes_to_move == False:
-								try: 
+								try:
 									nodes_to_move = random.sample(subG_nodes, random.choice(np.arange(1, maxNodes+1)))
 									have_nodes_to_move = True
-								except ValueError: 
+								except ValueError:
 									have_nodes_to_move = False
 									trial += 1
-									if trial > 50: break      
+									if trial > 50: break
 
 							partList_tmp = ujson_copy (bestpartList)
 
@@ -1135,10 +1137,10 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 							# partDict_tmp = {int(k):v for k,v in partDict_tmp.items()}
 							# partList_tmp = [get_part(partDict_tmp, n) for n in list(G_nodes)]
 
-							# swap the selected nodes to other cells in this partition 
+							# swap the selected nodes to other cells in this partition
 							# print(nodes_to_move)
 							# given certain probability, new cells can be added
-							# if len(subG_nodes)/len(subG_cells) >= populate_cell: 
+							# if len(subG_nodes)/len(subG_cells) >= populate_cell:
 							# 	new_cell = np.random.poisson(populate_cell_rate)
 							# 	# print('new cells', new_cell)
 							# 	subG_cells.extend ([max(partList_tmp)+c for c in range(1, new_cell+1)])
@@ -1155,15 +1157,15 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 								# partDict_tmp[node_part].remove(node)
 								# partDict_tmp[new_part].append(node)
 								partList_tmp[node_idx] = new_part
-						
+
 							# check if all cells are within size constrains after shifting, and if all nodes in a cell have at least one common edge
 							# part_sizes = [len(partDict_tmp[cell]) for cell in partDict_tmp]
 							max_part_size = max(collections.Counter(partList_tmp).values())
 							min_part_size = min(collections.Counter(partList_tmp).values())
-							
-							if dist_boolean: 
+
+							if dist_boolean:
 								distance_boolean = distance_constraint (G_primitive, subG_cells, partList_tmp)
-								
+
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax ) and distance_boolean
 							else:
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )
@@ -1186,30 +1188,30 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 							# decide to accept or reject swaps based on priority and T
 							accept = False
 
-							if loop_free == 'TRUE': 
+							if loop_free == 'TRUE':
 								subG_motif_const = subG_new_loop_free and subG_new_motif_allowed
-							else: 
+							else:
 								subG_motif_const = subG_new_motif_allowed
 
 							if priority == 'T':
 								if subG_motif_const:
 									if cell in cell_met_const:
-										T_new = max(calc_signal_path2 (partG_new))	
+										T_new = max(calc_signal_path2 (partG_new))
 										if T_new < minT_i:
 											accept = True
 											# print('chosen cell', cell)
 											# print('both part loop free and motif valid')
 											# print('T improved, swap accepted')
-									else: 
+									else:
 										accept = True
 										# print('chosen cell', cell)
 										T_new = max(calc_signal_path2 (partG_new))
 							# 			print('original part not loop free and motif valid')
 							# 			print('T improved or equal, swap accepted')
 							elif priority == 'C':
-								if subG_motif_const: 
-									if cell not in cell_met_const: 
-										accept = True 
+								if subG_motif_const:
+									if cell not in cell_met_const:
+										accept = True
 										# T_new = max(calc_signal_path2 (partG_new))
 										# print('original part not loop free and motif valid, swap accepted')
 
@@ -1217,38 +1219,38 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 								cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 								if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
 									# check loop free
-									if loop_free == 'TRUE': 
+									if loop_free == 'TRUE':
 										loop_free_tmp = check_cycles (partG_new)
-										if loop_free_tmp: 
+										if loop_free_tmp:
 											# print('number of cells with unmet constraint goes down, swap accepted')
 											last_updated = t
 											# update best partition results
 											bestpartList = ujson_copy(partList_tmp)
 											# print('best part', bestpartList)
 											try:
-												minT_i = T_new 
-											except UnboundLocalError: 
+												minT_i = T_new
+											except UnboundLocalError:
 												# minT_i = max(calc_signal_path2 (partG_new))
 												minT_i = 'NA'
 											timproved_list.append (t)
 											locked_nodes.extend (nodes_to_move)
-											# update partition matrix 
+											# update partition matrix
 											bestmatrix = np.array([row[:] for row in matrix_new])
 											# print('best matrix', bestmatrix)
 											cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
 											# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 											print('cells unmet constraint', cell_unmet_const)
 							bestT_list.append(minT_i)
-						except ValueError: 
+						except ValueError:
 							pass
 
-				else: 
+				else:
 					print('all constraints satisfied, breaking loop')
 					soln_found = True
-					break 
+					break
 
 			# print('bestT', bestT_list)
-			bestT_dict[i] = bestT_list 
+			bestT_dict[i] = bestT_list
 			timproved_dict[i] = timproved_list
 			bestpartDict = dict(zip(list(G_primitive.nodes()), bestpartList))
 			bestpartDict = {part:[node for node in bestpartDict.keys() if bestpartDict[node] == part] for part in set(bestpartDict.values())}
@@ -1258,7 +1260,7 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 			# visualize_assignment_graphviz (G, part_opt_format_best, nonprimitives, primitive_only, outdir, i, [])
 
 		print('recording solution')
-		# write best partition result and best T 
+		# write best partition result and best T
 		f_out = open(outdir + 'minT.txt', 'a')
 		f_out2 = open(outdir + 'part_solns.txt', 'a')
 		f_out3 = open(outdir + 'part improved.txt', 'a')
@@ -1280,7 +1282,7 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 				f_out2.write('cut\t'+str(cut)+'\n')
 				for part in bestpartDict_all[i]:
 					f_out2.write('Partition '+str(part)+'\t'+','.join(bestpartDict_all[i][part])+'\n')
-	return soln_found, recorded_path 
+	return soln_found, recorded_path
 
 
 
@@ -1602,9 +1604,11 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 									elif cut == best_soln[0][1][0]:
 										best_soln.append((iteration, part_opt)) 
 
+
 					# # # # # # # # # # # # # # # # #
 					# Ron Update-- reduce duplicate solutions in best_soln.txt
 					# # # # # # # # # # # # # # # # #
+
 					# print("best soln", best_soln)
 					reduce_duplicate_set = set()
 					l_set = 0
@@ -1613,7 +1617,11 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 						# print("set: ", reduce_duplicate_set)
 						if len(reduce_duplicate_set) == l_set: continue
 						else: l_set += 1
+
 						# # # # # # # # # # # # # # # # #
+						# Ron Update-- reduce duplicate solutions in best_soln.txt
+						# # # # # # # # # # # # # # # # #
+
 
 						# compile results
 						matrix_bs, partG_bs = partition_matrix (G_primitive, soln[1][1])

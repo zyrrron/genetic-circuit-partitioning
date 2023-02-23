@@ -851,11 +851,18 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 							except IndexError: 
 								cell = random.choice(cell_met_const + cell_unmet_const)
 							print("cell", cell)
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: from random decision to having heuristic
-							# # # # # # # # # # # # # # # # #
+
 
 							# # # # # # # # # # # # # # # # #
+							# Ron-update: from randomly choose compartment to choose compartment with heuristic
+							# # # # # # # # # # # # # # # # #
+
+
+
+							# # # # # # # # # # # # # # # # #
+							# Ron-update: from randomly choose compartment to choose compartment with heuristic
+							# # # # # # # # # # # # # # # # #
+
 
 							# generate a subnetwork of this chosen cell and its neighboring cells
 							subG_cells = get_subnetwork (bestmatrix, cell)
@@ -870,7 +877,19 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 								except ValueError: 
 									have_nodes_to_move = False
 									trial += 1
-									if trial > 50: break      
+									if trial > 50: break
+
+
+							# # # # # # # # # # # # # # # # #
+							# Ron-update: from randomly choose nodes to choose nodes with heuristic
+							# # # # # # # # # # # # # # # # #
+
+
+
+							# # # # # # # # # # # # # # # # #
+							# Ron-update: from randomly choose nodes to choose nodes with heuristic
+							# # # # # # # # # # # # # # # # #
+
 
 							partList_tmp = ujson_copy (bestpartList)
 							# print('partList_best', partList_tmp)

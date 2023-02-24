@@ -545,7 +545,7 @@ def partition_matrix_update (G, matrix, partition, partition_new):
 
 def get_part_matrix_subG (matrix, partG, subG_cells):
 	""" 
-	subset the matrix to only include cells in subgraph, and remove cells not from subgraph from partG 
+	change the matrix to only include compartments in subgraph, and remove compartments not exists in the subnetwork from partG
 	""" 
 	submatrix = np.take(matrix, subG_cells, axis=0)      # take rows of subgraph cells
 	submatrix = np.take(submatrix, subG_cells, axis=1)   # take cols of subgraph cells
@@ -744,16 +744,20 @@ def distance_constraint (G, cells, partList):
 		node_part = partList[node_idx]
 		# print('node', node, 'part', node_part)
 		if node_part in cells: 
+			
+			# get neighbors of one given node in the whole graph
 			node_neighbors = list(nx.all_neighbors(G, node))
 			# print('node neighbors', node_neighbors)
 			neighbors_idx = [list(G.nodes()).index(neighbor) for neighbor in node_neighbors]
 			neighbors_part = [partList[idx] for idx in neighbors_idx]
 			# print('neighbors part', neighbors_part)
+			
 			# if none of the neighbors is in the same partitioned cell, and this node is not the only node within this cell
 			if  node_part not in neighbors_part: 
 				# print ('node does not have neighbors in the same partitioned cell')
 				if partList.count(node_part) != 1: 
 					distance = False
+					break
 					# print('this cell contain more than one node, distance boolean false')
 	return distance
 
@@ -828,20 +832,22 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 			print('cells that dont meet constraint in original partition', cell_unmet_const)
 
 			last_updated = 0
-			for t in range(1,int(timestep)):  # timestep
+			for t in range(1, int(timestep)):  # timestep
 				if t % 10000 == 0:
 					print(t)
 				# at each timestep, choose a swap that satisfies the gate number constraints of each cell 
 				# print('original part dict', partDict)
-				# print('bestpartList', bestpartList)
+				print('bestpartList', bestpartList)
 
 				if priority == 'T' or (priority == 'C' and cell_unmet_const != []):
 
 					if t - last_updated <= int(timestep*0.5):
 
 						part_constraint = False
+						t_part = 0
+						while part_constraint == False or t_part < 100:
 
-						while part_constraint == False:
+							t_part += 1
 							# randomly choose a cell 
 							try: 
 								if random.uniform(0, 1) < 0.2:
@@ -929,33 +935,35 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 								# Randomly choose compartment to shift the node
 								while new_part == node_part:
 									new_part = random.choice(subG_cells)
+								# print(new_part)
+								# partDict_tmp[node_part].remove(node)
+								# partDict_tmp[new_part].append(node)
+								partList_tmp[node_idx] = new_part
+								print("partList_tmp", partList_tmp)
+							print("choose nodes to move finished\n")
+
 
 								# # # # # # # # # # # # # # # # #
 								# Ron-update: Choose compartment to shift the nodes from its original part with heuristics
 								# # # # # # # # # # # # # # # # #
 
 								# print('cells unmet constraint + new empty compartment', cell_unmet_const+[max(subG_cells)])
-								while new_part == node_part:
-									new_part = choiceShiftCompartment(cell_unmet_const+[max(subG_cells)], )
+								# while new_part == node_part:
+								# 	new_part = chooceShiftCompartment(cell_unmet_const+[max(subG_cells)], )
 
 								# # # # # # # # # # # # # # # # #
 								# Ron-update: Choose compartment to shift the nodes from its original part with heuristics
 								# # # # # # # # # # # # # # # # #
 
 
-								# print(new_part)
-								# partDict_tmp[node_part].remove(node)
-								# partDict_tmp[new_part].append(node)
-								partList_tmp[node_idx] = new_part
-						
-							# check if all cells are within size constrains after shifting, and if all nodes in a cell have at least one common edge
+							# check if all cells are within size constrains after shifting
 							# part_sizes = [len(partDict_tmp[cell]) for cell in partDict_tmp]
+							# find the max and min size of compartments
 							max_part_size = max(collections.Counter(partList_tmp).values())
 							min_part_size = min(collections.Counter(partList_tmp).values())
-							
-							if dist_boolean: 
+
+							if dist_boolean:
 								distance_boolean = distance_constraint (G_primitive, subG_cells, partList_tmp)
-								
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax ) and distance_boolean
 							else:
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )
@@ -964,72 +972,78 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 							# size_constraint = all(s <= Smax for s in part_sizes) and all(s >= Smin for s in part_sizes)
 							# print('size constraint', part_constraint)
 
-						subG_cells = [cell for cell in subG_cells if cell in partList_tmp]
-						matrix_new, partG_new = partition_matrix_update (G_primitive, bestmatrix, bestpartList, partList_tmp)
+						if part_constraint:
 
-						try:
-							subG_matrix_new, subG_partG_new = get_part_matrix_subG (matrix_new, partG_new, subG_cells)
-							# print('subG of new part', subG_matrix_new)
-							# print('partG of new part', list(subG_partG_new.edges()))
-							# print('motif constraint', motif_constraint)
-							subG_new_loop_free, subG_new_motif_allowed = check_constraint (subG_matrix_new, subG_partG_new, motif_constraint)
-							# print('subgraph loop free', subG_new_loop_free)
-							# print('subgraph motif allowed', subG_new_motif_allowed)
-
-							# decide to accept or reject swaps based on priority and T
-							accept = False
-
-							if loop_free == 'TRUE': 
-								subG_motif_const = subG_new_loop_free and subG_new_motif_allowed
-							else: 
-								subG_motif_const = subG_new_motif_allowed
-
-							if priority == 'T':
-								if subG_motif_const:
-									if cell in cell_met_const:
-										T_new = max(calc_signal_path2 (partG_new))	
-										if T_new < minT_i:
+							# update current graph compartments, adj matrix for compartments after node shifting
+							subG_cells = [cell for cell in subG_cells if cell in partList_tmp]
+							matrix_new, partG_new = partition_matrix_update (G_primitive, bestmatrix, bestpartList, partList_tmp)
+							print("subG_cells", subG_cells)
+							print("matrix_new", matrix_new)
+							print("partG_new", partG_new)
+							
+							try:
+								subG_matrix_new, subG_partG_new = get_part_matrix_subG (matrix_new, partG_new, subG_cells)
+								print('subG of new part', subG_matrix_new)
+								print('partG of new part', list(subG_partG_new.edges()))
+								print('motif constraint', motif_constraint)
+								subG_new_loop_free, subG_new_motif_allowed = check_constraint (subG_matrix_new, subG_partG_new, motif_constraint)
+								# print('subgraph loop free', subG_new_loop_free)
+								# print('subgraph motif allowed', subG_new_motif_allowed)
+	
+								# decide to accept or reject swaps based on priority and T
+								accept = False
+	
+								if loop_free == 'TRUE': 
+									subG_motif_const = subG_new_loop_free and subG_new_motif_allowed
+								else: 
+									subG_motif_const = subG_new_motif_allowed
+	
+								if priority == 'T':
+									if subG_motif_const:
+										if cell in cell_met_const:
+											T_new = max(calc_signal_path2 (partG_new))	
+											if T_new < minT_i:
+												accept = True
+												# print('chosen cell', cell)
+												# print('both part loop free and motif valid')
+												# print('T improved, swap accepted')
+										else: 
 											accept = True
 											# print('chosen cell', cell)
-											# print('both part loop free and motif valid')
-											# print('T improved, swap accepted')
-									else: 
-										accept = True
-										# print('chosen cell', cell)
-										T_new = max(calc_signal_path2 (partG_new))
-							# 			print('original part not loop free and motif valid')
-							# 			print('T improved or equal, swap accepted')
-							elif priority == 'C':
-								if subG_motif_const: 
-									if cell not in cell_met_const: 
-										accept = True 
-										# T_new = max(calc_signal_path2 (partG_new))
-										# print('original part not loop free and motif valid, swap accepted')
-
-							if accept:
-								cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
-								if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
-									# print('number of cells with unmet constraint goes down, swap accepted')
-									last_updated = t
-									# update best partition results
-									bestpartList = ujson_copy(partList_tmp)
-									# print('best part', bestpartList)
-									try:
-										minT_i = T_new 
-									except UnboundLocalError: 
-										# minT_i = max(calc_signal_path2 (partG_new))
-										minT_i = 'NA'
-									timproved_list.append (t)
-									locked_nodes.extend (nodes_to_move)
-									# update partition matrix 
-									bestmatrix = np.array([row[:] for row in matrix_new])
-									# print('best matrix', bestmatrix)
-									cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
-									# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
-									print('cells unmet constraint', cell_unmet_const)
-							bestT_list.append(minT_i)
-						except ValueError: 
-							pass
+											T_new = max(calc_signal_path2 (partG_new))
+								# 			print('original part not loop free and motif valid')
+								# 			print('T improved or equal, swap accepted')
+								elif priority == 'C':
+									if subG_motif_const: 
+										if cell not in cell_met_const: 
+											accept = True 
+											# T_new = max(calc_signal_path2 (partG_new))
+											# print('original part not loop free and motif valid, swap accepted')
+	
+								if accept:
+									cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
+									if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
+										# print('number of cells with unmet constraint goes down, swap accepted')
+										last_updated = t
+										# update best partition results
+										bestpartList = ujson_copy(partList_tmp)
+										# print('best part', bestpartList)
+										try:
+											minT_i = T_new 
+										except UnboundLocalError: 
+											# minT_i = max(calc_signal_path2 (partG_new))
+											minT_i = 'NA'
+										timproved_list.append (t)
+										locked_nodes.extend (nodes_to_move)
+										# update partition matrix 
+										bestmatrix = np.array([row[:] for row in matrix_new])
+										# print('best matrix', bestmatrix)
+										cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
+										# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
+										print('cells unmet constraint', cell_unmet_const)
+								bestT_list.append(minT_i)
+							except ValueError: 
+								pass
 
 				else: 
 					print('all constraints satisfied, breaking loop')
@@ -1212,8 +1226,8 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 							min_part_size = min(collections.Counter(partList_tmp).values())
 
 							if dist_boolean:
+								# distance_boolean is used to check if one node in its compartment has no connection with other nodes in that compartment
 								distance_boolean = distance_constraint (G_primitive, subG_cells, partList_tmp)
-
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax ) and distance_boolean
 							else:
 								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )

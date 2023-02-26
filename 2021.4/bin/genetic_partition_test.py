@@ -330,7 +330,9 @@ def calc_signal_path2 (partG):
 	for in_node in in_nodes:
 		for out_node in out_nodes:
 			for path in sorted(nx.all_simple_edge_paths(partG, in_node, out_node)):
-				if (all(e in list(partG.edges()) for e in path)): # valid path that makes a directed path from source to target
+
+				# valid path that makes a directed path from source to target
+				if (all(e in list(partG.edges()) for e in path)):
 					cross = len(path) 
 					crosslist.append(cross)
 	return crosslist
@@ -1001,7 +1003,11 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 								if priority == 'T':
 									if subG_motif_const:
 										if cell in cell_met_const:
-											T_new = max(calc_signal_path2 (partG_new))	
+
+											# partG_new is a graph consists of compartments instead of nodes
+											T_new = max(calc_signal_path2 (partG_new))
+											print("T_new", T_new)
+											print("minT_i", minT_i)
 											if T_new < minT_i:
 												accept = True
 												# print('chosen cell', cell)
@@ -1014,30 +1020,51 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 								# 			print('original part not loop free and motif valid')
 								# 			print('T improved or equal, swap accepted')
 								elif priority == 'C':
-									if subG_motif_const: 
-										if cell not in cell_met_const: 
+									if subG_motif_const:
+
+										# if cell is from cell_unmet_const and becomes following the constraints after node shifting
+										# that means we made a good try and we should accept this attempt
+										if cell not in cell_met_const:
 											accept = True 
 											# T_new = max(calc_signal_path2 (partG_new))
 											# print('original part not loop free and motif valid, swap accepted')
-	
+
+								# update cell_unmet_const if current node shifting is acceptable
 								if accept:
 									cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
+
+									# we have less unmet constraint compartment than its previous value after this node shifting
 									if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
 										# print('number of cells with unmet constraint goes down, swap accepted')
 										last_updated = t
+
 										# update best partition results
 										bestpartList = ujson_copy(partList_tmp)
 										# print('best part', bestpartList)
+
 										try:
 											minT_i = T_new 
 										except UnboundLocalError: 
 											# minT_i = max(calc_signal_path2 (partG_new))
 											minT_i = 'NA'
 										timproved_list.append (t)
-										locked_nodes.extend (nodes_to_move)
-										# update partition matrix 
+
+
+										# # # # # # # # # # # # # # # # #
+										# Ron-update: choose nodes to be locked or still to be freedom in this part
+										# # # # # # # # # # # # # # # # #
+
+										locked_nodes.extend(nodes_to_move)
+
+										# # # # # # # # # # # # # # # # #
+										# Ron-update: choose nodes to be locked or still to be freedom in this part
+										# # # # # # # # # # # # # # # # #
+
+
+										# update partition matrix, copy the matrix after this node shifting
 										bestmatrix = np.array([row[:] for row in matrix_new])
-										# print('best matrix', bestmatrix)
+
+										# update cell_unmet_const, cell_met_const
 										cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
 										# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 										print('cells unmet constraint', cell_unmet_const)

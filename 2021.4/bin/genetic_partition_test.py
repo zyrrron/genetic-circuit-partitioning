@@ -763,6 +763,41 @@ def distance_constraint (G, cells, partList):
 					# print('this cell contain more than one node, distance boolean false')
 	return distance
 
+def find_cell_unmet_most_constraint(cell_unmet_const):
+	"""
+	find the compartment which unmeet most constraints from the list of cell_unmet_constraint.
+	"""
+	# randomly choose a cell
+	return random.choice(cell_unmet_const)
+
+
+def get_nodes_tobe_shifted(nv, subC_nodes):
+	"""
+	Get nv nodes to be shifted from current chosen compartment to others, collect the nodes cause the cycle issue or indegree-outdegree issue first
+	"""
+	# choose nv nodes randomly
+	nodes_to_move = random.sample(subC_nodes, nv)
+	return nodes_to_move
+
+
+def chooce_compartment_to_move(subG_cells, partList_tmp, node_idx):
+	"""
+	Choose a compartment in current subnetwork to move the given node in, try to meet all constraints after the node shifting
+	"""
+	# get the original compartment of the given node
+	node_part = partList_tmp[node_idx]
+	new_part = node_part
+	# print('original node part', node_part)
+
+	# Randomly choose compartment to shift the node
+	while new_part == node_part:
+		new_part = random.choice(subG_cells)
+
+	# print(new_part)
+	partList_tmp[node_idx] = new_part
+	return partList_tmp
+
+
 def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, maxNodes, populate_cell, populate_cell_rate, dist_boolean, motif_constraint, loop_free, priority, timestep, trajectories, outdir):
 	""" 
 	optimize based on signal travel time from inputs to the output 
@@ -842,9 +877,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 				print('bestpartList', bestpartList)
 
 				if priority == 'T' or (priority == 'C' and cell_unmet_const != []):
-
 					if t - last_updated <= int(timestep*0.5):
-
 						part_constraint = False
 
 
@@ -859,53 +892,47 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 						# # # # # # # # # # # # # # # # #
 
 
-						# # randomly choose a cell
-						# try:
-						# 	if random.uniform(0, 1) < 0.2:
-						# 		cell = random.choice(cell_met_const)
-						# 	else:
-						# 		cell = random.choice(cell_unmet_const)
-						# except IndexError:
-						# 	cell = random.choice(cell_met_const + cell_unmet_const)
-						# # print("cell", cell)
+						partList_tmp = ujson_copy(bestpartList)
+
+
+						# # # # # # # # # # # # # # # # #
+						# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+						# # # # # # # # # # # # # # # # #
+
+						# generate a subnetwork of this chosen compartment and its neighboring compartments
+						subG_cells = get_subnetwork(bestmatrix, cell)
+
+						# get nodes from currently chosen compartment
+						subC_nodes = list(set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] == cell]) - set(locked_nodes))
+
+						# add a new empty compartment into the subnetwork
+						newC = max(partList_tmp) + 1
+						subG_cells.append(newC)
+
+						# # # # # # # # # # # # # # # # #
+						# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+						# # # # # # # # # # # # # # # # #
+
 
 						# use t_part to record the attempts to shift nodes in current iteration, upperbound is 100
 						# if we cannot find good way to change, move one node from the chosen compartment into an empty new compartment
 						t_part = 0
 						while part_constraint == False or t_part < 100:
-
 							t_part += 1
 
-							# generate a subnetwork of this chosen cell and its neighboring cells
-							subG_cells = get_subnetwork (bestmatrix, cell)
-							subG_nodes = list( set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] in subG_cells]) - set(locked_nodes) )
-
-							# choose 1 to n (maxNodes) nodes randomly
-							trial, have_nodes_to_move = 0, False
-							while  have_nodes_to_move == False:
-								try: 
-									nodes_to_move = random.sample(subG_nodes, random.choice(np.arange(1, maxNodes+1)))
-									have_nodes_to_move = True
-								except ValueError: 
-									have_nodes_to_move = False
-									trial += 1
-									if trial > 50: break
-
 
 							# # # # # # # # # # # # # # # # #
 							# Ron-update: from randomly choose nodes to choose nodes with heuristic
 							# # # # # # # # # # # # # # # # #
 
-							# choose 1 to n (maxNodes) nodes from which cause the cycle issue or indegree-outdegree issue
-							# shift the nodes from current compartment to the new empty compartment and save them into "have_nodes_to_move"
-
+							# choose nv (random number in 1~maxNodes) nodes from which cause the cycle issue or indegree-outdegree issue
+							nv = random.choice(np.arange(1, maxNodes + 1))
+							nodes_to_move = get_nodes_tobe_shifted(nv, subC_nodes)
 
 							# # # # # # # # # # # # # # # # #
 							# Ron-update: from randomly choose nodes to choose nodes with heuristic
 							# # # # # # # # # # # # # # # # #
 
-
-							partList_tmp = ujson_copy (bestpartList)
 
 							# print('partList_tmp', partList_tmp)
 							# partDict_tmp = {int(k):v for k,v in partDict_tmp.items()}
@@ -923,46 +950,25 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 
 							# # # # # # # # # # # # # # # # #
-							# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+							# Ron-update: Choose compartment in current subC to shift the nodes from its original part with heuristics
 							# # # # # # # # # # # # # # # # #
 
-							subG_cells.extend([max(partList_tmp) + 1])
-
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: Add new empty compartment into the sub-network without any prerequisites
-							# # # # # # # # # # # # # # # # #
-
+							# get all compartments in subG_cells that meet constraints, include the empty compartment
 							for node in nodes_to_move:
 								# print('move node', node)
-								# print("G_nodes", G_nodes)
 								node_idx = list(G_nodes).index(node)
-								node_part = partList_tmp[node_idx]
-								# print('original node part', node_part)
-								new_part = node_part
 
-								# Randomly choose compartment to shift the node
-								while new_part == node_part:
-									new_part = random.choice(subG_cells)
-								# print(new_part)
-								# partDict_tmp[node_part].remove(node)
-								# partDict_tmp[new_part].append(node)
-								partList_tmp[node_idx] = new_part
-								# print("partList_tmp", partList_tmp)
+								print('all possible compartment to be chosen', subG_cells)
+								partList_tmp = chooce_compartment_to_move(subG_cells, partList_tmp, node_idx)
+
+							# print("partList_tmp", partList_tmp)
+
+							# # # # # # # # # # # # # # # # #
+							# Ron-update: Choose compartment to shift the nodes from its original part with heuristics
+							# # # # # # # # # # # # # # # # #
+
+
 							# print("choose nodes to move finished\n")
-
-
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: Choose compartment to shift the nodes from its original part with heuristics
-							# # # # # # # # # # # # # # # # #
-
-							# print('cells unmet constraint + new empty compartment', cell_unmet_const+[max(subG_cells)])
-							# while new_part == node_part:
-							# 	new_part = chooceShiftCompartment(cell_unmet_const+[max(subG_cells)], )
-
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: Choose compartment to shift the nodes from its original part with heuristics
-							# # # # # # # # # # # # # # # # #
-
 
 							# check if all cells are within size constrains after shifting
 							# part_sizes = [len(partDict_tmp[cell]) for cell in partDict_tmp]
@@ -981,8 +987,9 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 							# print('size constraint', part_constraint)
 
 						# when t_part = 100, that means we cannot find good way to shift nodes,
-						# so move one node from the chosen compartment into an empty new compartment
-
+						# so shift all nodes cause cycle issue or indegree-outdegree issue from current compartment to the new empty compartment
+						if t_part >= 100:
+							chooce_compartment_to_move(, partList_tmp, node_idx)
 
 
 						if part_constraint:

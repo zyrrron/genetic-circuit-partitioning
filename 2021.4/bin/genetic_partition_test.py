@@ -808,6 +808,19 @@ def move_node_to_compartment(subG_cells, partList_tmp, node_idx):
 	return partList_tmp
 
 
+def get_nodes_tobe_locked(cell_met_const_tmp, partList_tmp, nodes_to_move, G_nodes):
+	"""
+	Check each node in nodes_to_move, if they are in cell_met_const_tmp now, lock it. Otherwise, keep it free
+	"""
+	lock_nodes = []
+	for node in nodes_to_move:
+		node_idx = list(G_nodes).index(node)
+		node_part = partList_tmp[node_idx]
+		if node_part in cell_met_const_tmp:
+			lock_nodes.append(node)
+	return lock_nodes
+
+
 def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, maxNodes, populate_cell, populate_cell_rate, dist_boolean, motif_constraint, loop_free, priority, timestep, trajectories, outdir):
 	""" 
 	optimize based on signal travel time from inputs to the output 
@@ -1075,7 +1088,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 									cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 
 									# we have less unmet constraint compartment than its previous value after this node shifting
-									if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
+									if len(cell_unmet_const_tmp) < len(cell_unmet_const):
 										# print('number of cells with unmet constraint goes down, swap accepted')
 										last_updated = t
 
@@ -1095,7 +1108,8 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 										# Ron-update: choose nodes to be locked or still to be freedom in this part
 										# # # # # # # # # # # # # # # # #
 
-										locked_nodes.extend(nodes_to_move)
+										lock_nodes = get_nodes_tobe_locked(cell_met_const_tmp, partList_tmp, nodes_to_move, G_nodes)
+										locked_nodes.extend(lock_nodes)
 
 										# # # # # # # # # # # # # # # # #
 										# Ron-update: choose nodes to be locked or still to be freedom in this part

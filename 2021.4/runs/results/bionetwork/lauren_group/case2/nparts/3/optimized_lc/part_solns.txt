@@ -3,5 +3,5 @@ T	NA
 cut	4
 Partition 0	1,9,8
 Partition 1	2,5,3
-Partition 2	7,10
-Partition 3	4,6
+Partition 2	10
+Partition 3	7,4,6

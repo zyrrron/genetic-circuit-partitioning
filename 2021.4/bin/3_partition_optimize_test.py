@@ -53,7 +53,7 @@ def main():
 		G   = gp.load_graph_undirected (settings, s)
 		DAG = gp.load_graph (settings, s)
 
-		in_nodes, out_nodes, nonprimitives  = gp.get_nonprimitive_nodes (DAG)
+		in_nodes, out_nodes, nonprimitives = gp.get_nonprimitive_nodes (DAG)
 
 		if primitive_only == 'TRUE':
 			G_primitive = gp.get_G_primitive (DAG, nonprimitives)
@@ -74,44 +74,50 @@ def main():
 		# optimize graph partition results to satisfy constraints
 		if target_n == ['']:
 			nparts = [int(n) for n in os.listdir(outdir) if n.isdigit()]
-			# if len(nparts) >= 11:
-			# 	nparts = sorted(nparts)[0:10]
-			for npart in sorted(nparts):
-				if npart > 8:
-					print('target npart', npart)
-					part_sol_path = outdir + str(npart) + '/part_solns.txt'
-					cut, partDict = gp.load_metis_part_sol (part_sol_path)
-					sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
-					print('optimizing by subnetworks')
-					gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
-					print('execution time', time.time()-begin_time_current_step)
+			Smin, Smax = int(S_bounds[0]), int(S_bounds[1])
+			if len(G_primitive.nodes()) <= Smax:
+				print("*****************************************************")
+				print("Stop partitioning! You can put all nodes in one cell!")
+				print("*****************************************************")
 
-				else: 
-					print('target npart', npart)
-					part_sol_path = outdir + str(npart) + '/part_solns.txt'
-					cut, partDict = gp.load_metis_part_sol (part_sol_path)
-					sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
-					print('optimizing by subnetworks')
-					gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
-					print('execution time', time.time()-begin_time_current_step)
-					gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, high_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_hc/')
-					print('execution time', time.time()-begin_time_current_step)
+			else:
+				for npart in sorted(nparts):
+					if npart > 8:
+						print('target npart', npart)
+						part_sol_path = outdir + str(npart) + '/part_solns.txt'
+						cut, partDict = gp.load_metis_part_sol (part_sol_path)
+						sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
+						print('optimizing by subnetworks')
+						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
+						print('execution time', time.time()-begin_time_current_step)
 
-			# check solutions, if no solution, consider splitting a cell 
-			solDict = gp.load_opt_part_sol (sol_file)
-			for iteration in solDict:
-				part = solDict[iteration]['part'] 
-				cut = solDict[iteration]['cut']
-				part_opt = [gp.get_part(part, n) for n in G_primitive.nodes()]
-				matrix, partG = gp.partition_matrix (G_primitive, part_opt)
-				cell_unmet_const, cell_met_const = gp.get_cells_unmet_constraint (matrix, partG, low_constraint, loop_free)
-				loop_free_i, motif_allowed = gp.check_constraint (matrix, partG, low_constraint)	
-				print('cell_unmet', cell_unmet_const)
-				if len(cell_unmet_const) <= 2 and len(cell_unmet_const) > 0: 
-					gp.split_cells (DAG, primitive_only, S_bounds, cut, partDict, iteration, maxNodes, low_constraint, loop_free, priority, trajectories, outdir + str(npart) +'/optimized_lc/')
-				if len(cell_unmet_const) == 0 and loop_free_i and motif_allowed:
-					print('has solution') 
-					break 
+					else:
+						print('target npart', npart)
+						part_sol_path = outdir + str(npart) + '/part_solns.txt'
+						cut, partDict = gp.load_metis_part_sol (part_sol_path)
+						sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
+						print('optimizing by subnetworks')
+						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
+						print('execution time', time.time()-begin_time_current_step)
+						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, high_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_hc/')
+						print('execution time', time.time()-begin_time_current_step)
+
+
+				# check solutions, if no solution, consider splitting a cell
+				solDict = gp.load_opt_part_sol (sol_file)
+				for iteration in solDict:
+					part = solDict[iteration]['part']
+					cut = solDict[iteration]['cut']
+					part_opt = [gp.get_part(part, n) for n in G_primitive.nodes()]
+					matrix, partG = gp.partition_matrix (G_primitive, part_opt)
+					cell_unmet_const, cell_met_const = gp.get_cells_unmet_constraint (matrix, partG, low_constraint, loop_free)
+					loop_free_i, motif_allowed = gp.check_constraint (matrix, partG, low_constraint)
+					print('cell_unmet', cell_unmet_const)
+					if len(cell_unmet_const) <= 2 and len(cell_unmet_const) > 0:
+						gp.split_cells (DAG, primitive_only, S_bounds, cut, partDict, iteration, maxNodes, low_constraint, loop_free, priority, trajectories, outdir + str(npart) +'/optimized_lc/')
+					if len(cell_unmet_const) == 0 and loop_free_i and motif_allowed:
+						print('has solution')
+						break
 
 		else:
 			for n in target_n:

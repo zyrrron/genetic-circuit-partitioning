@@ -1,5 +1,0 @@
-path	1
-T	NA
-cut	1
-Partition 0	1,3,2
-Partition 1	4,6,5

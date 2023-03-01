@@ -738,24 +738,25 @@ def ujson_copy (oriList):
 	return newList
 
 def distance_constraint (G, cells, partList):
-	""" nodes have at neighbors within the same partitioned cell """
+	"""
+	Ron-update: Make sure all nodes are not isolated in one compartment
+	Check nodes in subG_cells one by one. Find the neighbors of a currently chosen node.
+	If the node has no any neighbor in the same compartment with it, return False.
+	"""
 	distance = True
 	# print('checking distance boolean')
 	for node in G.nodes(): 
 		node_idx = list(G.nodes()).index(node)
 		node_part = partList[node_idx]
-		# print('node', node, 'part', node_part)
 		if node_part in cells: 
 			
 			# get neighbors of one given node in the whole graph
 			node_neighbors = list(nx.all_neighbors(G, node))
-			# print('node neighbors', node_neighbors)
 			neighbors_idx = [list(G.nodes()).index(neighbor) for neighbor in node_neighbors]
 			neighbors_part = [partList[idx] for idx in neighbors_idx]
-			# print('neighbors part', neighbors_part)
 			
 			# if none of the neighbors is in the same partitioned cell, and this node is not the only node within this cell
-			if  node_part not in neighbors_part: 
+			if node_part not in neighbors_part:
 				# print ('node does not have neighbors in the same partitioned cell')
 				if partList.count(node_part) != 1: 
 					distance = False
@@ -774,7 +775,7 @@ def find_cell_unmet_most_constraint(cell_unmet_const):
 
 def check_constraint_state_subG(subG_cells, cell_unmet_const):
 	"""
-	check the constraint states (meet, or unmeet) of all compartments in subnetwork
+	check the constraint states (meet, or unmeet) of all compartments in subnetwork. Done
 	"""
 	cell_unmet_subG = list(set(cell_unmet_const).intersection(set(subG_cells)))
 	cell_met_subG = list(set(subG_cells).difference(set(cell_unmet_const)))
@@ -868,299 +869,302 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	else: 
 		os.mkdir(outdir)
 
-	if len(G_primitive.nodes()) > Smax:
+	if len(G_primitive.nodes()) <= Smax:
+		return
 
-		bestT_dict = dict()
-		timproved_dict = dict() # record the timestep at which T is improved
-		bestpartDict_all = dict()
-		bestpartList_all = dict()
+	bestT_dict = dict()
+	timproved_dict = dict() # record the timestep at which T is improved
+	bestpartDict_all = dict()
+	bestpartList_all = dict()
 
-		for i in range(1, trajectories+1):  # for given number of trajectories
-			print('iteration', i)
-			bestpartList = copy.deepcopy (partList)
-			bestT_list   = [minT_o]
-			minT_i       = minT_o
-			locked_nodes = []
-			timproved_list = []
-			soln_found = False
+	for i in range(1, trajectories+1):  # for given number of trajectories
+		print('iteration', i)
+		bestpartList = copy.deepcopy (partList)
+		bestT_list   = [minT_o]
+		minT_i       = minT_o
+		locked_nodes = []
+		timproved_list = []
+		soln_found = False
 
-			# cut_bp = cal_cut (G, bestpartDict)
-			bestmatrix, bestpartG = partition_matrix(G_primitive, bestpartList)
-			# print(bestmatrix)
-			# get subnetworks that do not satisfy constraints
-			cell_unmet_const, cell_met_const = get_cells_unmet_constraint (bestmatrix, bestpartG, motif_constraint, loop_free)
-			print('cells that dont meet constraint in original partition', cell_unmet_const)
+		# cut_bp = cal_cut (G, bestpartDict)
+		bestmatrix, bestpartG = partition_matrix(G_primitive, bestpartList)
+		# print(bestmatrix)
+		# get subnetworks that do not satisfy constraints
+		cell_unmet_const, cell_met_const = get_cells_unmet_constraint (bestmatrix, bestpartG, motif_constraint, loop_free)
+		print('cells that dont meet constraint in original partition', cell_unmet_const)
 
-			last_updated = 0
-			for t in range(1, int(timestep)):  # timestep
-				if t % 10000 == 0:
-					print(t)
-				# at each timestep, choose a swap that satisfies the gate number constraints of each cell 
-				# print('original part dict', partDict)
-				print('bestpartList', bestpartList)
+		last_updated = 0
+		for t in range(1, int(timestep)):  # timestep
+			if t % 10000 == 0:
+				print(t)
+			# at each timestep, choose a swap that satisfies the gate number constraints of each cell
+			# print('original part dict', partDict)
+			print('bestpartList', bestpartList)
 
-				if priority == 'T' or (priority == 'C' and cell_unmet_const != []):
-					if t - last_updated <= int(timestep*0.5):
-						part_constraint = False
+			if priority == 'T' or (priority == 'C' and cell_unmet_const != []):
+				if t - last_updated <= int(timestep*0.5):
+					part_constraint = False
+
+
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+					# Ron-update: change randomly choose compartment to choose the compartment unmeet the most constraints
+					# # # # # # # # # # # # # # # # #
+
+					cell = find_cell_unmet_most_constraint(cell_unmet_const)
+					print(cell)
+
+					# # # # # # # # # # # # # # # # #
+					# Ron-update: change randomly choose compartment to choose the compartment unmeet the most constraints
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+					partList_tmp = ujson_copy(bestpartList)
+
+
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+					# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+					# # # # # # # # # # # # # # # # #
+
+					# generate a subnetwork of this chosen compartment and its neighboring compartments
+					subG_cells = get_subnetwork(bestmatrix, cell)
+
+					# get all unlocked nodes from currently chosen compartment
+					subC_nodes = list(set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] == cell]) - set(locked_nodes))
+
+					# add a new empty compartment into the subnetwork
+					new_empty_C = max(partList_tmp) + 1
+					subG_cells.append(new_empty_C)
+
+					# get all compartments in subG_cells that meet constraints, include the empty compartment
+					cell_unmet_subG, cell_met_subG = check_constraint_state_subG(subG_cells, cell_unmet_const)
+					print(cell_unmet_subG, cell_met_subG)
+
+					# # # # # # # # # # # # # # # # #
+					# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+					# Use t_part to record the attempts to shift nodes in the current iteration, upper bound is 100.
+					# If we cannot change the current compartment to meet all the constraints,
+					# move one node from the chosen compartment into an empty new compartment.
+					t_part = 0
+					nodes_to_move = []
+					while part_constraint == False and t_part < 100:
+						t_part += 1
 
 
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-						# Ron-update: from randomly choose compartment to choose compartment unmeet most constraints
+						# Ron-update: from randomly choose nodes to choose nodes with heuristic
 						# # # # # # # # # # # # # # # # #
 
-						cell = find_cell_unmet_most_constraint(cell_unmet_const)
-						print(cell)
+						# choose nv (random number in 1~maxNodes) nodes from the unlocked nodes in the current compartment
+						nv_upperbound = min(maxNodes, len(subC_nodes))
+						nv = random.choice(np.arange(1, nv_upperbound + 1))
+						nodes_to_move = get_nodes_tobe_shifted(nv, subC_nodes)
 
 						# # # # # # # # # # # # # # # # #
-						# Ron-update: from randomly choose compartment to choose compartment unmeet most constraints
+						# Ron-update: from randomly choose nodes to choose nodes with heuristic
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-						partList_tmp = ujson_copy(bestpartList)
+						# print('partList_tmp', partList_tmp)
+						# partDict_tmp = {int(k):v for k,v in partDict_tmp.items()}
+						# partList_tmp = [get_part(partDict_tmp, n) for n in list(G_nodes)]
+						# print(nodes_to_move)
+						# shift the selected nodes to other neighbor compartments and the add new empty cells generated by poisson distribution
+						# if len(subG_nodes)/len(subG_cells) >= populate_cell:
+						# 	new_cell = np.random.poisson(populate_cell_rate)
+						# 	print("populate_cell_rate", populate_cell_rate)
+						# 	print('new cells', new_cell)
+						# 	print('partList_best', partList_tmp)
+						# 	print('original cells', subG_cells)
+						# 	subG_cells.extend ([max(partList_tmp)+c for c in range(1, new_cell+1)])
+						# 	print('add new cells', subG_cells)
 
 
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-						# Ron-update: Add new empty compartment into the sub-network without any prerequisites
+						# Ron-update: Try to shift nodes
 						# # # # # # # # # # # # # # # # #
-
-						# generate a subnetwork of this chosen compartment and its neighboring compartments
-						subG_cells = get_subnetwork(bestmatrix, cell)
-
-						# get nodes from currently chosen compartment
-						subC_nodes = list(set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] == cell]) - set(locked_nodes))
-
-						# add a new empty compartment into the subnetwork
-						new_empty_C = max(partList_tmp) + 1
-						subG_cells.append(new_empty_C)
-
-						# get all compartments in subG_cells that meet constraints, include the empty compartment
-						cell_unmet_subG, cell_met_subG = check_constraint_state_subG(subG_cells, cell_unmet_const)
-						print(cell_unmet_subG, cell_met_subG)
-
-
-						# # # # # # # # # # # # # # # # #
-						# Ron-update: Add new empty compartment into the sub-network without any prerequisites
-						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-
-						# use t_part to record the attempts to shift nodes in the current iteration, upper bound is 100
-						# if we cannot find a good way to change, move one node from the chosen compartment into an empty new compartment
-						t_part = 0
-						nodes_to_move = []
-						while part_constraint == False and t_part < 100:
-							t_part += 1
-
-
-							# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-							# Ron-update: from randomly choose nodes to choose nodes with heuristic
-							# # # # # # # # # # # # # # # # #
-
-							# choose nv (random number in 1~maxNodes) nodes from which cause the cycle issue or indegree-outdegree issue
-							nv_upperbound = min(maxNodes, len(subC_nodes))
-							nv = random.choice(np.arange(1, nv_upperbound + 1))
-							nodes_to_move = get_nodes_tobe_shifted(nv, subC_nodes)
-
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: from randomly choose nodes to choose nodes with heuristic
-							# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-
-							# print('partList_tmp', partList_tmp)
-							# partDict_tmp = {int(k):v for k,v in partDict_tmp.items()}
-							# partList_tmp = [get_part(partDict_tmp, n) for n in list(G_nodes)]
-							# print(nodes_to_move)
-							# shift the selected nodes to other neighbor compartments and the add new empty cells generated by poisson distribution
-							# if len(subG_nodes)/len(subG_cells) >= populate_cell:
-							# 	new_cell = np.random.poisson(populate_cell_rate)
-							# 	print("populate_cell_rate", populate_cell_rate)
-							# 	print('new cells', new_cell)
-							# 	print('partList_best', partList_tmp)
-							# 	print('original cells', subG_cells)
-							# 	subG_cells.extend ([max(partList_tmp)+c for c in range(1, new_cell+1)])
-							# 	print('add new cells', subG_cells)
-
-
-							# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-							# Ron-update: Choose compartment in current subnetwork to shift the nodes from its original compartment
-							# # # # # # # # # # # # # # # # #
-							print('nodes to move', nodes_to_move)
-							for node in nodes_to_move:
-								print('move node', node)
-								node_idx = list(G_nodes).index(node)
-								partList_tmp = move_node_to_compartment(cell_met_subG, partList_tmp, node_idx)
-
-							print("partList_tmp", partList_tmp)
-
-							# # # # # # # # # # # # # # # # #
-							# Ron-update: Choose compartment in current subnetwork to shift the nodes from its original compartment
-							# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-
-							# print("choose nodes to move finished\n")
-
-							# check if all cells are within size constrains after shifting
-							# find the max and min size of compartments
-							max_part_size = max(collections.Counter(partList_tmp).values())
-							min_part_size = min(collections.Counter(partList_tmp).values())
-							# print(max_part_size, min_part_size)
-
-							if dist_boolean:
-								distance_boolean = distance_constraint (G_primitive, subG_cells, partList_tmp)
-								# print(distance_boolean)
-								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax ) and distance_boolean
-							else:
-								part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )
-
-							print("check size constraint", part_constraint)
-
-						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-						# Ron-update: force to split one node in current compartment to the empty compartment after 100 attempts
-						# # # # # # # # # # # # # # # # #
-
-						# when t_part = 100, that means we cannot find good way to shift nodes,
-						# so shift one of the nodes from current compartment to the new empty compartment
-						if t_part >= 100:
-							node = random.choice(subC_nodes)
+						print('nodes to move', nodes_to_move)
+						for node in nodes_to_move:
+							print('move node', node)
 							node_idx = list(G_nodes).index(node)
-							partList_tmp[node_idx] = new_empty_C
+							partList_tmp = move_node_to_compartment(cell_met_subG, partList_tmp, node_idx)
 
-						print("skip while")
+						print("partList_tmp", partList_tmp)
 
 						# # # # # # # # # # # # # # # # #
-						# Ron-update: force to split one node in current compartment to the empty compartment after 100 attempts
+						# Ron-update: Try to shift nodes
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-						if part_constraint:
+						# print("choose nodes to move finished\n")
 
-							# update current graph compartments, adj matrix for compartments after node shifting
-							subG_cells = [cell for cell in subG_cells if cell in partList_tmp]
-							matrix_new, partG_new = partition_matrix_update (G_primitive, bestmatrix, bestpartList, partList_tmp)
-							
-							try:
-								subG_matrix_new, subG_partG_new = get_part_matrix_subG (matrix_new, partG_new, subG_cells)
-								# print('subG of new part', subG_matrix_new)
-								# print('partG of new part', list(subG_partG_new.edges()))
-								# print('motif constraint', motif_constraint)
-								subG_new_loop_free, subG_new_motif_allowed = check_constraint (subG_matrix_new, subG_partG_new, motif_constraint)
-								# print('subgraph loop free', subG_new_loop_free)
-								# print('subgraph motif allowed', subG_new_motif_allowed)
-	
-								# decide to accept or reject swaps based on priority and T
-								accept = False
-	
-								if loop_free == 'TRUE': 
-									subG_motif_const = subG_new_loop_free and subG_new_motif_allowed
-								else: 
-									subG_motif_const = subG_new_motif_allowed
-	
-								if priority == 'T':
-									if subG_motif_const:
-										if cell in cell_met_const:
+						# Check if all cells are within size constrains after shifting
+						# find the max and min size of compartments
+						max_part_size = max(collections.Counter(partList_tmp).values())
+						min_part_size = min(collections.Counter(partList_tmp).values())
+						# print(max_part_size, min_part_size)
 
-											# partG_new is a graph consists of compartments instead of nodes
-											T_new = max(calc_signal_path2 (partG_new))
-											# print("T_new", T_new)
-											# print("minT_i", minT_i)
-											if T_new < minT_i:
-												accept = True
-												# print('chosen cell', cell)
-												# print('both part loop free and motif valid')
-												# print('T improved, swap accepted')
-										else: 
+						# distance_constraint() is used to try to keep one node at least have one
+						if dist_boolean:
+							distance_boolean = distance_constraint (G_primitive, subG_cells, partList_tmp)
+							part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax ) and distance_boolean
+						else:
+							part_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )
+						print("check size constraint", part_constraint)
+
+
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+					# Ron-update: force to split one node in current compartment to the empty compartment after 100 attempts
+					# # # # # # # # # # # # # # # # #
+
+					# when t_part = 100, that means we cannot find good way to shift nodes,
+					# so shift one of the nodes from current compartment to the new empty compartment
+					if t_part >= 100:
+						node = random.choice(subC_nodes)
+						node_idx = list(G_nodes).index(node)
+						partList_tmp[node_idx] = new_empty_C
+
+					print("skip while")
+
+					# # # # # # # # # # # # # # # # #
+					# Ron-update: force to split one node in current compartment to the empty compartment after 100 attempts
+					# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+					if part_constraint:
+
+						# update current graph compartments, adj matrix for compartments after node shifting
+						subG_cells = [cell for cell in subG_cells if cell in partList_tmp]
+						matrix_new, partG_new = partition_matrix_update (G_primitive, bestmatrix, bestpartList, partList_tmp)
+
+						try:
+							subG_matrix_new, subG_partG_new = get_part_matrix_subG (matrix_new, partG_new, subG_cells)
+							# print('subG of new part', subG_matrix_new)
+							# print('partG of new part', list(subG_partG_new.edges()))
+							# print('motif constraint', motif_constraint)
+							subG_new_loop_free, subG_new_motif_allowed = check_constraint (subG_matrix_new, subG_partG_new, motif_constraint)
+							# print('subgraph loop free', subG_new_loop_free)
+							# print('subgraph motif allowed', subG_new_motif_allowed)
+
+							# decide to accept or reject swaps based on priority and T
+							accept = False
+
+							if loop_free == 'TRUE':
+								subG_motif_const = subG_new_loop_free and subG_new_motif_allowed
+							else:
+								subG_motif_const = subG_new_motif_allowed
+
+							if priority == 'T':
+								if subG_motif_const:
+									if cell in cell_met_const:
+
+										# partG_new is a graph consists of compartments instead of nodes
+										T_new = max(calc_signal_path2 (partG_new))
+										# print("T_new", T_new)
+										# print("minT_i", minT_i)
+										if T_new < minT_i:
 											accept = True
 											# print('chosen cell', cell)
-											T_new = max(calc_signal_path2 (partG_new))
-								# 			print('original part not loop free and motif valid')
-								# 			print('T improved or equal, swap accepted')
-								elif priority == 'C':
-									if subG_motif_const:
+											# print('both part loop free and motif valid')
+											# print('T improved, swap accepted')
+									else:
+										accept = True
+										# print('chosen cell', cell)
+										T_new = max(calc_signal_path2 (partG_new))
+							# 			print('original part not loop free and motif valid')
+							# 			print('T improved or equal, swap accepted')
+							elif priority == 'C':
+								if subG_motif_const:
 
-										# if cell is from cell_unmet_const and becomes following the constraints after node shifting
-										# that means we made a good try and we should accept this attempt
-										if cell not in cell_met_const:
-											accept = True 
-											# T_new = max(calc_signal_path2 (partG_new))
-											# print('original part not loop free and motif valid, swap accepted')
+									# if cell is from cell_unmet_const and becomes following the constraints after node shifting
+									# that means we made a good try and we should accept this attempt
+									if cell not in cell_met_const:
+										accept = True
+										# T_new = max(calc_signal_path2 (partG_new))
+										# print('original part not loop free and motif valid, swap accepted')
 
-								# update cell_unmet_const if current node shifting is acceptable
-								if accept:
-									cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
+							# update cell_unmet_const if current node shifting is acceptable
+							if accept:
+								cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 
-									# we have less unmet constraint compartment than its previous value after this node shifting
-									if len(cell_unmet_const_tmp) < len(cell_unmet_const):
-										# print('number of cells with unmet constraint goes down, swap accepted')
-										last_updated = t
+								# we have less unmet constraint compartment than its previous value after this node shifting
+								if len(cell_unmet_const_tmp) < len(cell_unmet_const):
+									# print('number of cells with unmet constraint goes down, swap accepted')
+									last_updated = t
 
-										# update best partition results
-										bestpartList = ujson_copy(partList_tmp)
-										# print('best part', bestpartList)
+									# update best partition results
+									bestpartList = ujson_copy(partList_tmp)
+									# print('best part', bestpartList)
 
-										try:
-											minT_i = T_new 
-										except UnboundLocalError: 
-											# minT_i = max(calc_signal_path2 (partG_new))
-											minT_i = 'NA'
-										timproved_list.append (t)
-
-
-										# # # # # # # # # # # # # # # # #
-										# Ron-update: choose nodes to be locked or still to be freedom in this part
-										# # # # # # # # # # # # # # # # #
-
-										lock_nodes = get_nodes_tobe_locked(cell_met_const_tmp, partList_tmp, nodes_to_move, G_nodes)
-										locked_nodes.extend(lock_nodes)
-
-										# # # # # # # # # # # # # # # # #
-										# Ron-update: choose nodes to be locked or still to be freedom in this part
-										# # # # # # # # # # # # # # # # #
+									try:
+										minT_i = T_new
+									except UnboundLocalError:
+										# minT_i = max(calc_signal_path2 (partG_new))
+										minT_i = 'NA'
+									timproved_list.append (t)
 
 
-										# update partition matrix, copy the matrix after this node shifting
-										bestmatrix = np.array([row[:] for row in matrix_new])
+									# # # # # # # # # # # # # # # # #
+									# Ron-update: choose nodes to be locked or still to be freedom in this part
+									# # # # # # # # # # # # # # # # #
 
-										# update cell_unmet_const, cell_met_const after accepting the node shifting
-										cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
-										# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
-										print('cells unmet constraint', cell_unmet_const)
-								bestT_list.append(minT_i)
-							except ValueError: 
-								pass
+									lock_nodes = get_nodes_tobe_locked(cell_met_const_tmp, partList_tmp, nodes_to_move, G_nodes)
+									locked_nodes.extend(lock_nodes)
 
-				else: 
-					print('all constraints satisfied, breaking loop')
-					soln_found = True
-					break 
+									# # # # # # # # # # # # # # # # #
+									# Ron-update: choose nodes to be locked or still to be freedom in this part
+									# # # # # # # # # # # # # # # # #
 
-			# print('bestT', bestT_list)
-			bestT_dict[i] = bestT_list 
-			timproved_dict[i] = timproved_list
-			bestpartDict = dict(zip(list(G_primitive.nodes()), bestpartList))
-			bestpartDict = {part:[node for node in bestpartDict.keys() if bestpartDict[node] == part] for part in set(bestpartDict.values())}
-			bestpartDict_all[i] = bestpartDict
-			bestpartList_all[i] = bestpartList
-			# part_opt_format_best = [get_part(bestpartDict, n) for n in G_primitive.nodes()]
-			# visualize_assignment_graphviz (G, part_opt_format_best, nonprimitives, primitive_only, outdir, i, [])
 
-		print('recording solution')
-		# write best partition result and best T 
-		f_out = open(outdir + 'minT.txt', 'w')
-		f_out2 = open(outdir + 'part_solns.txt', 'w')
-		f_out3 = open(outdir + 'part improved.txt', 'w')
-		f_out.write('iteration\tminT\n')
-		f_out3.write('iteration\tt\n')
+									# update partition matrix, copy the matrix after this node shifting
+									bestmatrix = np.array([row[:] for row in matrix_new])
 
-		for i in bestT_dict:
-			# matrix, partG = partition_matrix (G_primitive, bestpartList_all[i])
-			f_out.write(str(i)+'\t'+','.join([str(T) for T in bestT_dict[i]])+'\n')
-			f_out3.write(str(i)+'\t'+','.join([str(t) for t in timproved_dict[i]])+'\n')
-			cut = cal_cut (G_primitive, bestpartDict_all[i])
-			T = bestT_dict[i][-1]
-			f_out2.write('path\t'+str(i)+'\n')
-			f_out2.write('T\t'+str(T)+'\n')
-			f_out2.write('cut\t'+str(cut)+'\n')
-			for part in bestpartDict_all[i]:
-				f_out2.write('Partition '+str(part)+'\t'+','.join(bestpartDict_all[i][part])+'\n')
+									# update cell_unmet_const, cell_met_const after accepting the node shifting
+									cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
+									# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
+									print('cells unmet constraint', cell_unmet_const)
+							bestT_list.append(minT_i)
+						except ValueError:
+							pass
+
+			else:
+				print('all constraints satisfied, breaking loop')
+				soln_found = True
+				break
+
+		# print('bestT', bestT_list)
+		bestT_dict[i] = bestT_list
+		timproved_dict[i] = timproved_list
+		bestpartDict = dict(zip(list(G_primitive.nodes()), bestpartList))
+		bestpartDict = {part:[node for node in bestpartDict.keys() if bestpartDict[node] == part] for part in set(bestpartDict.values())}
+		bestpartDict_all[i] = bestpartDict
+		bestpartList_all[i] = bestpartList
+		# part_opt_format_best = [get_part(bestpartDict, n) for n in G_primitive.nodes()]
+		# visualize_assignment_graphviz (G, part_opt_format_best, nonprimitives, primitive_only, outdir, i, [])
+
+	print('recording solution')
+	# write best partition result and best T
+	f_out = open(outdir + 'minT.txt', 'w')
+	f_out2 = open(outdir + 'part_solns.txt', 'w')
+	f_out3 = open(outdir + 'part improved.txt', 'w')
+	f_out.write('iteration\tminT\n')
+	f_out3.write('iteration\tt\n')
+
+	for i in bestT_dict:
+		# matrix, partG = partition_matrix (G_primitive, bestpartList_all[i])
+		f_out.write(str(i)+'\t'+','.join([str(T) for T in bestT_dict[i]])+'\n')
+		f_out3.write(str(i)+'\t'+','.join([str(t) for t in timproved_dict[i]])+'\n')
+		cut = cal_cut (G_primitive, bestpartDict_all[i])
+		T = bestT_dict[i][-1]
+		f_out2.write('path\t'+str(i)+'\n')
+		f_out2.write('T\t'+str(T)+'\n')
+		f_out2.write('cut\t'+str(cut)+'\n')
+		t_part = 0
+		for part in bestpartDict_all[i]:
+			f_out2.write('Partition '+str(t_part)+'\t'+','.join(bestpartDict_all[i][part])+'\n')
+			t_part += 1
 
 
 def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxNodes, populate_cell, populate_cell_rate, dist_boolean, motif_constraint, loop_free, priority, timestep, trajectories, tot_i, outdir):

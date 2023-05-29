@@ -13,7 +13,7 @@ def print_subfolder_names():
             dictD[rootName] = list()
             if rootName == '8':
                 for folder_name in directories:
-                    dictD[rootName].append(f"{rootName}input_{folder_name}-6c\t./benchmark/{rootName}-input-boolean-circuits/{folder_name}\t./lib\tTRUE\t1,7\t\t3\t2,2\t6\tTRUE\tC\t5\t./results/{rootName}-input-boolean-circuits/{folder_name}-6c")
+                    dictD[rootName].append(f"{rootName}input_{folder_name}-5c\t./benchmark/{rootName}-input-boolean-circuits/{folder_name}\t./lib\tTRUE\t1,7\t\t3\t2,2\t5\tTRUE\tC\t5\t./results/{rootName}-input-boolean-circuits/{folder_name}-5c")
 
     dictD = dict(sorted(dictD.items()))
     for d in dictD:

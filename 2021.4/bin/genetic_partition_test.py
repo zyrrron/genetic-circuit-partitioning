@@ -211,6 +211,7 @@ def read_json(inputfile):
 				gates[s]['output'][port] = int(bits)
 	return ports, gates
 
+
 def synthesize_graph (ports, gates, outdir, t):
 	G = nx.DiGraph()
 	# start from the output, add edges
@@ -249,8 +250,6 @@ def synthesize_graph (ports, gates, outdir, t):
 	for e in edges:
 		G.add_edge(*e)
 
-	# write graph
-	# nx.write_adjlist(G, outdir+'/DAG.adjlist')
 	nx.write_edgelist(G, outdir+'/DAG.edgelist')
 
 
@@ -986,6 +985,9 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 					# get all unlocked nodes from currently chosen compartment
 					subC_nodes = list(set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] == cell]) - set(locked_nodes))
+
+					# get all unlocked nodes from current sub-network
+					subG_nodes = list(set([n for n in G_nodes if bestpartList[list(G_nodes).index(n)] in subG_cells]) - set(locked_nodes))
 
 					# add a new empty compartment into the subnetwork
 					new_empty_C = max(partList_tmp) + 1

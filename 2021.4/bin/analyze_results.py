@@ -1175,19 +1175,25 @@ def plot_histogram() :
 def collect_nodes_num(Path, dir, dirr):
 	dir1 = Path + dir + dirr
 	count1, benchmarks_name = [], []
-	for benchmark in os.listdir(dir1):
-		if not benchmark.startswith('.'):
-			edgelist1 = dir1 + '/' + benchmark + '/DAG.edgelist'
-			if os.path.exists(edgelist1):
-				node_number1 = get_node_number(edgelist1)
-				count1.append(node_number1)
-				benchmarks_name.append(benchmark)
+	# for benchmark in os.listdir(dir1):
+	# 	if not benchmark.startswith('.'):
+	# 		edgelist1 = dir1 + '/' + benchmark + '/DAG.edgelist'
+	# 		if os.path.exists(edgelist1):
+	# 			node_number1 = get_node_number(edgelist1)
+	# 			count1.append(node_number1)
+	# 			benchmarks_name.append(benchmark)
 
-	dictionary = dict(zip(benchmarks_name, count1))
-	outcsvpath = f"{Path}/runs/results/nodes_info/{dirr}.csv"
-	with open(outcsvpath, 'w', newline='') as f:
-		dataframe = pd.DataFrame.from_dict(dictionary, orient='index', columns=["node number"])
-		dataframe.to_csv(outcsvpath)
+	node_number1 = get_node_number(dir1 + '/DAG.edgelist')
+	g = load_graph(dir1 + '/DAG.edgelist')
+	edge_number = g.number_of_edges()
+	print(node_number1, edge_number)
+
+	# dictionary = dict(zip(benchmarks_name, count1))
+	# os.makedirs(f"{Path}/runs/results/nodes_info/agc", exist_ok=True)
+	# outcsvpath = f"{Path}/runs/results/nodes_info/{dirr}.csv"
+	# with open(outcsvpath, 'w', newline='') as f:
+	# 	dataframe = pd.DataFrame.from_dict(dictionary, orient='index', columns=["node number"])
+	# 	dataframe.to_csv(outcsvpath)
 
 
 if __name__ == '__main__':
@@ -1196,7 +1202,8 @@ if __name__ == '__main__':
 
 	# count_nodes (PATH + '/runs/results/4-input-boolean-circuits', PATH + '/runs/results/5-input-boolean-circuits')
 	# collect_nodes_num(PATH, '/runs/benchmark/', '8-input-boolean-circuits')
-	collect_nodes_num(PATH, '/runs/benchmark/', 'electronic-circuits')
+	collect_nodes_num(PATH, '/runs/benchmark/', 'agc')
+	collect_nodes_num(PATH, '/runs/benchmark/sha256-master/', 'src/rtl/sha256')
 	# partition_stats ()
 	# compile_best_solutions ()
 	# plot_timestep ()

@@ -31,7 +31,7 @@ def main():
 
 	for s in samples:
 		print ('Processing sample', s)
-		print(settings[s])
+		# print(settings[s])
 		# obtain user-defined params (TO BE MOVED TO MAIN)
 		S_bounds        = settings[s]['S_bounds'].split(',')
 		target_n        = settings[s]['target_n'].split(',')
@@ -51,8 +51,7 @@ def main():
 			nonprimitives = []
 
 		# make output directories
-		if os.path.exists(out_path) == False:
-			os.mkdir(out_path)
+		os.makedirs(out_path, exist_ok=True)
 		if os.path.exists(out_path + '/nparts/') == False:
 			os.mkdir(out_path+'/nparts/')
 
@@ -64,7 +63,6 @@ def main():
 			nparts = list(range(int(len(G_primitive.nodes())/max_nodes)+1, int(len(G_primitive.nodes())/min_nodes)+1))
 			# decide how many nparts folders to be created, we can set [start: end] to have faster searching
 			for n in nparts:
-				print('Partitioning graph into ', n, ' parts')
 				outdir   = out_path + '/nparts/' + str(n)
 				if os.path.exists(outdir) == False:
 					os.mkdir(outdir)

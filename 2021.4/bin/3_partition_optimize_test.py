@@ -5,19 +5,21 @@
 # 	All rights reserved.
 #	OSI Non-Profit Open Software License ("Non-Profit OSL") 3.0 license.
 
+
 # Supporting modules
 import argparse
 import genetic_partition_test as gp
-from pycallgraph import PyCallGraph
-from pycallgraph.output import GraphvizOutput
 import os
 import csv
 import time
 import copy
 
+# set the max run time for one sample as 1 minute = 60 seconds
+max_runtime = 60
+
 def main():
 
-	graphviz = GraphvizOutput()
+	# graphviz = GraphvizOutput()
 	# graphviz.output_file = 'partition_RCA4.png'
 
 	begin_time = time.time()
@@ -33,6 +35,7 @@ def main():
 	settings = gp.load_settings(args.settings)
 
 	for s in samples:
+		begin_time_sample = time.time()
 		print ('Processing sample', s)
 		# print (settings[s])
 		# obtain user-defined params 
@@ -46,7 +49,7 @@ def main():
 		priority        = settings[s]['priority']
 		trajectories    = int(settings[s]['trajectories'])
 		out_path        = settings[s]['output_path']
-		timestep = 1000000
+		timestep = 10000
 
 		begin_time_current_step = time.time()
 		# load graph 
@@ -63,13 +66,13 @@ def main():
 
 		outdir = out_path + '/nparts/'
 		order = gp.rank_connectivity (DAG, primitive_only, outdir)
-		print('median degree of connectivity in subgraphs', order)
+		# print('median degree of connectivity in subgraphs', order)
 
 		order = gp.rank_constraint_met (DAG, primitive_only, high_constraint, loop_free, outdir)
-		print('percent of cells with unmet constraint under high constraint', order)
+		# print('percent of cells with unmet constraint under high constraint', order)
 
 		order = gp.rank_constraint_met (DAG, primitive_only, low_constraint, loop_free, outdir)
-		print('percent of cells with unmet constraint under low constraint', order)
+		# print('percent of cells with unmet constraint under low constraint', order)
 
 		# optimize graph partition results to satisfy constraints
 		if target_n == ['']:
@@ -82,25 +85,24 @@ def main():
 
 			else:
 				for npart in sorted(nparts):
+					print('target npart', npart)
 					if npart > 8:
-						print('target npart', npart)
 						part_sol_path = outdir + str(npart) + '/part_solns.txt'
 						cut, partDict = gp.load_metis_part_sol (part_sol_path)
 						sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
-						print('optimizing by subnetworks')
+						# print('optimizing by subnetworks')
 						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
-						print('execution time', time.time()-begin_time_current_step)
-
+						# print('execution time', time.time()-begin_time_current_step)
 					else:
-						print('target npart', npart)
+						# print('target npart', npart)
 						part_sol_path = outdir + str(npart) + '/part_solns.txt'
 						cut, partDict = gp.load_metis_part_sol (part_sol_path)
 						sol_file = outdir + str(npart) +'/optimized_lc/part_solns.txt'
-						print('optimizing by subnetworks')
+						# print('optimizing by subnetworks')
 						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_lc/')
-						print('execution time', time.time()-begin_time_current_step)
+						# print('execution time', time.time()-begin_time_current_step)
 						gp.optimize_signal_subnetwork_tmp (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, 2, True, high_constraint, loop_free, priority, timestep, trajectories, outdir + str(npart) +'/optimized_hc/')
-						print('execution time', time.time()-begin_time_current_step)
+						# print('execution time', time.time()-begin_time_current_step)
 
 
 				# check solutions, if no solution, consider splitting a cell
@@ -113,8 +115,16 @@ def main():
 					cell_unmet_const, cell_met_const = gp.get_cells_unmet_constraint (matrix, partG, low_constraint, loop_free)
 					loop_free_i, motif_allowed = gp.check_constraint (matrix, partG, low_constraint)
 					print('cell_unmet', cell_unmet_const)
-					if len(cell_unmet_const) <= 2 and len(cell_unmet_const) > 0:
+					end_time_sampel = time.time()
+
+					# set timer for the iteration
+					if end_time_sampel - begin_time_sample > max_runtime:
+						print("Time runs out!")
+						break
+
+					if 2 >= len(cell_unmet_const) > 0:
 						gp.split_cells (DAG, primitive_only, S_bounds, cut, partDict, iteration, maxNodes, low_constraint, loop_free, priority, trajectories, outdir + str(npart) +'/optimized_lc/')
+
 					if len(cell_unmet_const) == 0 and loop_free_i and motif_allowed:
 						print('has solution')
 						break
@@ -126,8 +136,8 @@ def main():
 				part_sol = outdir + n + '/part_solns.txt'
 				cut, partDict = gp.load_metis_part_sol (part_sol)
 				if len(list(G.nodes()))>=15:
-					print('optimizing by subnetworks')
-					print('optimizing with low constraint')
+					# print('optimizing by subnetworks')
+					# print('optimizing with low constraint')
 					gp.optimize_signal_subnetwork (DAG, primitive_only, S_bounds, cut, partDict, maxNodes, 3, True, low_constraint, loop_free, priority, timestep, trajectories, outdir + n + '/optimized_lc/')
 				else:
 					print('brute-force optimizing')

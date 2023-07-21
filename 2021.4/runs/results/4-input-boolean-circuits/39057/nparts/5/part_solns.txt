@@ -1,6 +1,0 @@
-cut	7
-Partition 0	380,386,379
-Partition 1	387,378,388
-Partition 2	383,390,391
-Partition 3	393,389,385
-Partition 4	392,382,384,381

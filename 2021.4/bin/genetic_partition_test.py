@@ -32,11 +32,8 @@ from functools import partial
 import os
 import seaborn as sns
 import shutil
-from networkx.drawing.nx_agraph import graphviz_layout
 import re
 import ujson
-from pycallgraph import PyCallGraph
-from pycallgraph.output import GraphvizOutput
 import numpy.linalg as la
 import scipy.cluster.vq as vq
 import scipy
@@ -71,7 +68,7 @@ def load_settings (filename):
 
 
 def load_graph (settings, sample):
-	""" 
+	"""
 	read DAG edgelist, return DIRECTED graph, and input/output nodes 
 	"""
 	G = nx.read_edgelist (edgelist_filename (settings, sample), nodetype = str, create_using=nx.DiGraph())
@@ -92,7 +89,7 @@ def load_metis_part_sol (inputfile):
 	lines = [open(inputfile, 'r').read().strip("\n")][0].split('\n')
 	cut = int( lines[0].split('\t')[1] )
 	partDict = {}
-	for line in lines[1:]: 
+	for line in lines[1:]:
 		tokens = line.split('\t')
 		part = int( tokens[0].split(' ')[-1] )
 		nodes = tokens[1].split(',')
@@ -101,7 +98,7 @@ def load_metis_part_sol (inputfile):
 	return cut, partDict
 
 def load_opt_part_sol (inputfile):
-	""" 
+	"""
 	load optimized solution 
 	"""
 	lines = [open(inputfile, 'r').read().strip("\n")][0].split('\n')
@@ -113,7 +110,7 @@ def load_opt_part_sol (inputfile):
 		solDict[iteration] = {}
 		try:
 			solDict[iteration]['T'] = int( lines[idx+1].split('\t')[1] )
-		except ValueError: 
+		except ValueError:
 			solDict[iteration]['T'] = lines[idx+1].split('\t')[1]
 		solDict[iteration]['cut'] = int( lines[idx+2].split('\t')[1] )
 		solDict[iteration]['part'] = {}
@@ -121,7 +118,7 @@ def load_opt_part_sol (inputfile):
 		if idx!= iteration_idx[-1] and len(iteration_idx)!= 1: part_lines = lines[idx+3:iteration_idx[i+1]]
 		else: part_lines = lines[idx+3:]
 
-		for line in part_lines: 
+		for line in part_lines:
 			tokens = line.split('\t')
 			part = int( tokens[0].split(' ')[-1] )
 			nodes = tokens[1].split(',')
@@ -134,7 +131,7 @@ def load_minT_sol (inputfile):
 	minTDict = {}
 	for line in lines[1:]:
 		iteration, minT = int(line.split('\t')[0]), line.split('\t')[1]
-		minTDict[iteration] = minT 
+		minTDict[iteration] = minT
 	return minTDict
 
 
@@ -167,7 +164,7 @@ def read_json(inputfile):
 		s = re.search('"(.*)"', s)
 		el = s.group(1)
 		ports[el] = {}
-		# get directions 
+		# get directions
 		s = lines[v+1].strip()
 		s = re.search('"direction": "(.*)"', s)
 		direction = s.group(1)
@@ -180,10 +177,17 @@ def read_json(inputfile):
 			s = lines[v + 3].strip()
 		# get bits
 		bits = s.split('[')[1].split(']')[0].strip()
-		ports[el]['bits'] = int(bits)
-	# get information of gates 
+		if ',' in bits:
+			del ports[el]
+			continue
+		else:
+			if bits == '"0"':
+				ports[el]['bits'] = 0
+			else:
+				ports[el]['bits'] = int(bits)
+	# get information of gates
 	spacer = [idx+g_s+1 for idx, line in enumerate(lines[g_s+1:g_e]) if '$abc$' in line.strip()]
-	for i, v in enumerate(spacer): 
+	for i, v in enumerate(spacer):
 		# get names
 		s = int(lines[v].strip().split('"')[1].split('$')[-1])
 		gates[s] = {}
@@ -192,19 +196,21 @@ def read_json(inputfile):
 		# search for attributes of this gate
 		if i != len(spacer)-1:
 			searchlines = lines[v:spacer[i+1]]
-		else: 
+		else:
 			searchlines = lines[v:]
 		for sl in searchlines:
 			# get gate type
 			if sl.strip().startswith('"type"'):
 				gatetype = re.search('_(.*)_', sl.strip())
+				if gatetype is None:
+					break
 				gates[s]['type'] = gatetype.group(1)
 			# get input(s)
 			if sl.strip().startswith('"A": [') or sl.strip().startswith('"B": ['):
 				port = re.search('"(.*)"', sl).group(1)
 				bits = sl.split('[')[1].split(']')[0].strip()
 				gates[s]['input'][port] = int(bits)
-			# get output 
+			# get output
 			if sl.strip().startswith('"Y": ['):
 				port = re.search('"(.*)"', sl).group(1)
 				bits = sl.split('[')[1].split(']')[0].strip()
@@ -238,7 +244,7 @@ def synthesize_graph (ports, gates, outdir, t):
 
 	for g in gates:
 		op = gates[g]['output']['Y']
-		for sg in gates: 
+		for sg in gates:
 			if gates[sg]['type'] == 'NOT':
 				gin = [gates[sg]['input']['A']]
 			else:
@@ -272,38 +278,38 @@ def get_nonprimitive_nodes (G):
 		if indegree == 0:
 			in_nodes.append(node)
 	nonprimitives = in_nodes + out_nodes
-	return in_nodes, out_nodes, nonprimitives 
+	return in_nodes, out_nodes, nonprimitives
 
-def get_G_primitive (G, nonprimitives): 
-	""" 
+def get_G_primitive (G, nonprimitives):
+	"""
 	if primitive only is True, remove input and output nodes 
 	"""
-	G_primitive = nx.DiGraph() 
+	G_primitive = nx.DiGraph()
 	for edge in G.edges():
 		if edge[0] not in nonprimitives and edge[1] not in nonprimitives:
 			G_primitive.add_edge(*edge)
 	return G_primitive
 
-def get_undirected_G_primitive (G, nonprimitives): 
-	""" 
+def get_undirected_G_primitive (G, nonprimitives):
+	"""
 	if primitive only is True, remove input and output nodes 
 	"""
-	G_primitive = nx.Graph() 
+	G_primitive = nx.Graph()
 	for edge in G.edges():
 		if edge[0] not in nonprimitives and edge[1] not in nonprimitives:
 			G_primitive.add_edge(*edge)
 	return G_primitive
 
-def get_part (partDict, node): 
+def get_part (partDict, node):
 	"""
 	get the subgraph name that node is partitioned into 
-	""" 
-	for part, nodelist in partDict.items(): 
-		if node in nodelist: 
+	"""
+	for part, nodelist in partDict.items():
+		if node in nodelist:
 			return part
 
 def calc_signal_path (G, in_nodes, out_nodes, partDict):
-	""" 
+	"""
 	count the number of boundaries that each input has to pass in order to reach the output 
 	"""
 	crosslist = []
@@ -317,7 +323,7 @@ def calc_signal_path (G, in_nodes, out_nodes, partDict):
 							if get_part(partDict, e[0]) != get_part(partDict, e[1]):
 								cross += 1
 					crosslist.append(cross)
-	print(crosslist)
+	# print(crosslist)
 	return crosslist
 
 def calc_signal_path2 (partG):
@@ -332,19 +338,19 @@ def calc_signal_path2 (partG):
 
 				# valid path that makes a directed path from source to target
 				if (all(e in list(partG.edges()) for e in path)):
-					cross = len(path) 
+					cross = len(path)
 					crosslist.append(cross)
 	return crosslist
 
 def cal_cut (G, partDict):
-	""" 
+	"""
 	calculate the cut in a new partition 
 	"""
 	cut = 0
 	for edge in G.edges():
 		part0 = get_part(partDict, edge[0])
 		part1 = get_part(partDict, edge[1])
-		if part0 != part1: 
+		if part0 != part1:
 			cut += 1
 	return cut
 
@@ -356,41 +362,41 @@ def generate_combinations (n, rlist):
 	return combs
 
 def check_cycles (partG):
-	""" 
+	"""
 	check if partitioned cells contain cycles/loops 
 	"""
 	try:
 		cycles = nx.find_cycle(partG)
 		cycle_free = False
-	except: 
+	except:
 		cycle_free = True
-		pass 
+		pass
 	return cycle_free
 
 def check_motif_allowed(matrix, motif_constraint):
-	""" 
+	"""
 	check if all cells have allowed communications 
-	""" 
+	"""
 	motif_allowed = True
 	out_deg = np.sum(matrix, axis=1)
 	in_deg = np.sum(matrix, axis=0)
 	summed_deg = np.sum(matrix, axis=1)+np.sum(matrix, axis=0)
 
-	if len(motif_constraint) == 2:    # high constraint 
+	if len(motif_constraint) == 2:    # high constraint
 		max_in, max_out = int(motif_constraint[0]), int(motif_constraint[1])
-		if max(in_deg) > max_in: # sum by rows 
+		if max(in_deg) > max_in: # sum by rows
 			motif_allowed = False
 		if max(out_deg) > max_out: # sum by cols
 			motif_allowed = False
 		if max(summed_deg) > max_in + max_out:
 			motif_allowed = False
-	else:                             # low constraint 
+	else:                             # low constraint
 		if max(summed_deg) > int(motif_constraint[0]):\
 			motif_allowed = False
 	return motif_allowed
 
 def check_constraint (matrix, partG, motif_constraint):
-	""" 
+	"""
 	check if all cells in the supplied matrix have satisfy constraints 
 	"""
 	loop_free = check_cycles (partG)
@@ -400,7 +406,7 @@ def check_constraint (matrix, partG, motif_constraint):
 def copy_graph (g):
 	g2 = nx.DiGraph()
 	g2.add_edges_from(list(g.edges()))
-	return g2 
+	return g2
 
 
 ###########################################
@@ -408,17 +414,17 @@ def copy_graph (g):
 ###########################################
 
 def run_metis (G, n):
-	""" 
+	"""
 	partitions a network into n subgraphs using metis
 	"""
 	part = metis.part_graph(G, nparts = n, recursive=True)
 	return part
 
 def partition_nparts_wrapper (G, n, outdir):
-	""" 
+	"""
 	partition circuit into all possible nparts (wrapper function)
 	"""
-	# partition circuit into nparts 
+	# partition circuit into nparts
 	if len(list(G.nodes())) > 1:
 
 		part_opt = run_metis (G, n)
@@ -427,10 +433,10 @@ def partition_nparts_wrapper (G, n, outdir):
 		f_out.write('cut\t'+str(part_opt[0])+'\n')
 		for part in range(max(part_opt[1])+1):
 			nodeIdx = [a for a, b in enumerate(part_opt[1]) if b == part]
-			nodes = [list(G.nodes())[node] for node in nodeIdx] 
+			nodes = [list(G.nodes())[node] for node in nodeIdx]
 			f_out.write('Partition '+str(part)+'\t')
 			f_out.write(','.join([str(node) for node in nodes])+'\n')
-	
+
 	return part_opt
 
 def spectral_clustering(G, targetn):
@@ -443,34 +449,34 @@ def spectral_clustering(G, targetn):
 	f = U[:,1]                                # Fiedler vector f of L
 	means, labels = vq.kmeans2(U[:,1:targetn], targetn)
 
-	# count cuts 
+	# count cuts
 	cut_edge = 0
 	for i in range(0, max(labels)+1):
 		degree_seq = labels.tolist()
-		nodeIdx = [a for a, b in enumerate(degree_seq) if b == i]   # get the indexes of nodes with degree i 
+		nodeIdx = [a for a, b in enumerate(degree_seq) if b == i]   # get the indexes of nodes with degree i
 		nodes = [list(G.nodes())[node] for node in nodeIdx]
 		other_nodes = list(set(G.nodes()) - set(nodes))
-		for v in nodes: 
+		for v in nodes:
 			cut_edge += len(set(G.neighbors(v)).intersection(set(other_nodes)))
 	cut_edge = cut_edge / 2    # the cut edges are counted twice
 
 	return (cut_edge, labels.tolist())
 
 def clustering_nparts_wrapper (G, n, outdir):
-	""" 
+	"""
 	partition circuit into all possible nparts (wrapper function)
 	"""
-	# partition circuit into nparts 
+	# partition circuit into nparts
 	if len(list(G.nodes())) > 1:
 		part_opt = spectral_clustering(G, n)
 		outfile = outdir +'/part_solns.txt'
 		f_out = open(outfile, 'w')
 		f_out.write('cut\t'+str(int(part_opt[0]))+'\n')
 
-		part_n = 0                                                                                                                     
+		part_n = 0
 		for part in range(max(part_opt[1])+1):
 			nodeIdx = [a for a, b in enumerate(part_opt[1]) if b == part]
-			nodes = [list(G.nodes())[node] for node in nodeIdx] 
+			nodes = [list(G.nodes())[node] for node in nodeIdx]
 			if nodes != []:
 				f_out.write('Partition '+str(part_n)+'\t')
 				f_out.write(','.join([str(node) for node in nodes])+'\n')
@@ -494,29 +500,29 @@ def partition_matrix (G, partition):
 	# generate DAG representing cell-cell communication from the adjency matrix
 	rows, cols = np.where(matrix != 0)
 	edges = zip(rows.tolist(), cols.tolist())
-	partG = nx.DiGraph() 
-	partG.add_edges_from(edges) 
+	partG = nx.DiGraph()
+	partG.add_edges_from(edges)
 
 	return matrix, partG
 
 def partition_matrix_update (G, matrix, partition, partition_new):
 	""" update adjacency matrix of cells after cell partition is updated """
 
-	try: 
+	try:
 		matrix_updated = np.zeros (shape=(max(partition_new)+1, max(partition_new)+1))
 		for i in range(matrix.shape[0]):
 			for j in range(matrix.shape[1]):
 				matrix_updated[i][j] = matrix[i][j]
-	except IndexError:  
+	except IndexError:
 		matrix_updated = np.array([row[:] for row in matrix])
 
-	# nodes that are moved 
+	# nodes that are moved
 	nodes_idx = [idx for idx, item in enumerate(partition_new) if partition[idx] != partition_new[idx]]
 	nodes     = [list(G.nodes())[idx] for idx in nodes_idx]
 	edges_updated = []
 	# edges that are changed
 	for node in nodes:
-		# print('node', node) 
+		# print('node', node)
 		edges = [e for e in G.edges() if node in e]
 		edges_not_updated = list(set(edges) - set(edges_updated))
 		for edge in edges_not_updated:
@@ -539,19 +545,19 @@ def partition_matrix_update (G, matrix, partition, partition_new):
 	# generate DAG representing cell-cell communication from the adjency matrix
 	rows, cols = np.where(matrix_updated != 0)
 	edges = zip(rows.tolist(), cols.tolist())
-	partG = nx.DiGraph() 
-	partG.add_edges_from(edges) 
+	partG = nx.DiGraph()
+	partG.add_edges_from(edges)
 
 	return matrix_updated, partG
 
 def get_part_matrix_subG (matrix, partG, subG_cells):
-	""" 
+	"""
 	change the matrix to only include compartments in subgraph, and remove compartments not exists in the subnetwork from partG
-	""" 
+	"""
 	submatrix = np.take(matrix, subG_cells, axis=0)      # take rows of subgraph cells
 	submatrix = np.take(submatrix, subG_cells, axis=1)   # take cols of subgraph cells
 
-	# generate DAG representing cell-cell communication 
+	# generate DAG representing cell-cell communication
 	partG_subG = copy_graph (partG)
 	for cell in list(partG.nodes()):
 		if cell not in subG_cells:
@@ -578,7 +584,7 @@ def get_connectivity (G, primitive_only, partDict):
 	else:
 		G_primitive   = copy.deepcopy (G)
 		nonprimitives = []
-	
+
 	part_opt = [get_part(partDict, n) for n in G_primitive.nodes()]
 	matrix, partG = partition_matrix(G_primitive, part_opt)
 	sum_row = matrix.sum(axis=1)
@@ -602,7 +608,7 @@ def rank_connectivity (G, primitive_only, outdir):
 	nparts = os.listdir(outdir)
 	mean_part_degree = {}
 
-	for npart in nparts: 
+	for npart in nparts:
 		if npart.isdigit():
 			cut, partDict = load_metis_part_sol (outdir+npart+'/part_solns.txt')
 			part_opt = [get_part(partDict, n) for n in G_primitive.nodes()]
@@ -610,7 +616,7 @@ def rank_connectivity (G, primitive_only, outdir):
 			sum_row = matrix.sum(axis=1)
 			sum_col = matrix.sum(axis=0)
 			mean_degree = np.median(sum_col + sum_row.T)
-			mean_part_degree[npart] = mean_degree 
+			mean_part_degree[npart] = mean_degree
 
 	return sorted(mean_part_degree.items(), key=lambda x: x[1])
 
@@ -629,7 +635,7 @@ def rank_constraint_met (G, primitive_only, motif_constraint, loop_free, outdir)
 	nparts = os.listdir(outdir)
 	perc_cell_unmet = {}
 
-	for npart in nparts: 
+	for npart in nparts:
 		if npart.isdigit():
 			cut, partDict = load_metis_part_sol (outdir+npart+'/part_solns.txt')
 			part_opt = [get_part(partDict, n) for n in G_primitive.nodes()]
@@ -644,18 +650,18 @@ def rank_constraint_met (G, primitive_only, motif_constraint, loop_free, outdir)
 # Visualization 
 ###########################################
 
-def visualize_assignment_graphviz (G, partition, nonprimitives, primitive_only, outdir, iteration, highlight): 
-	""" 
+def visualize_assignment_graphviz (G, partition, nonprimitives, primitive_only, outdir, iteration, highlight):
+	"""
 	visualize the partitioned graph with each color representing a partitioned block
 	"""
 	if primitive_only == 'TRUE':
 		G_primitive = get_G_primitive (G, nonprimitives)
-	else: 
+	else:
 		G_primitive = copy.deepcopy (G)
 
 	fig = plt.figure(figsize=(14,7))
 
-	# plot the partition assignment 
+	# plot the partition assignment
 	ax = fig.add_subplot(1,2,1)
 	# color = ['#bac964', '#438a5e', '#ffcbcb', '#f7d1ba', '#dbe3e5']
 	color = sns.color_palette('hls', n_colors=max(partition)+1)
@@ -671,7 +677,7 @@ def visualize_assignment_graphviz (G, partition, nonprimitives, primitive_only, 
 	for i in range(max(partition)+1):
 		nodeIdx = [a for a, b in enumerate(partition) if b == i]
 		nodes = [list(G_primitive.nodes())[n] for n in nodeIdx]
-		# if len(list(G.nodes())) < 30: 
+		# if len(list(G.nodes())) < 30:
 		nx.draw (G, pos, nodelist=nodes, node_size=80, font_size=5, arrowsize=5, width=0.5, with_labels=True, node_color=color[i])
 		# else:
 			# nx.draw (G, pos, nodelist=nodes, node_size=5, font_size=0.5, arrowsize=1, width=0.5, with_labels=True, node_color=color[i])
@@ -693,9 +699,9 @@ def visualize_assignment_graphviz (G, partition, nonprimitives, primitive_only, 
 		nx.draw_networkx_nodes(partG, pos, nodelist=highlight, node_size=300, node_color='red')
 	labels = {n:n for n in partG.nodes()}
 	nx.draw_networkx_labels(partG, pos, labels)
-	# draw loops 
+	# draw loops
 	nx.draw_networkx_edges(partG, pos, loops, connectionstyle='arc3, rad=0.1')
-	# draw non-loops 
+	# draw non-loops
 	nx.draw_networkx_edges(partG, pos, nloops)
 	ax2.axis('off')
 
@@ -718,16 +724,16 @@ def get_cells_unmet_constraint (matrix, partG, motif_constraint, loop_free):
 		# if loop free is required, check whether motif constraint AND loop free are met for each cell
 		if loop_free == 'TRUE':
 			subG_loop_free, subG_motif_allowed = check_constraint (subG_matrix, subG_partG, motif_constraint)
-			if subG_loop_free and subG_motif_allowed: 
+			if subG_loop_free and subG_motif_allowed:
 				cell_met_const.append (cell)
-			else: 
+			else:
 				cell_unmet_const.append (cell)
 		# if loop free is not required, only check whether motif constraint is met for each cell
 		elif loop_free == 'FALSE':
 			subG_motif_allowed = check_motif_allowed (subG_matrix, motif_constraint)
-			if subG_motif_allowed: 
+			if subG_motif_allowed:
 				cell_met_const.append (cell)
-			else: 
+			else:
 				cell_unmet_const.append (cell)
 	return cell_unmet_const, cell_met_const
 
@@ -744,20 +750,20 @@ def distance_constraint (G, cells, partList):
 	"""
 	distance = True
 	# print('checking distance boolean')
-	for node in G.nodes(): 
+	for node in G.nodes():
 		node_idx = list(G.nodes()).index(node)
 		node_part = partList[node_idx]
-		if node_part in cells: 
-			
+		if node_part in cells:
+
 			# get neighbors of one given node in the whole graph
 			node_neighbors = list(nx.all_neighbors(G, node))
 			neighbors_idx = [list(G.nodes()).index(neighbor) for neighbor in node_neighbors]
 			neighbors_part = [partList[idx] for idx in neighbors_idx]
-			
+
 			# if none of the neighbors is in the same partitioned cell, and this node is not the only node within this cell
 			if node_part not in neighbors_part:
 				# print ('node does not have neighbors in the same partitioned cell')
-				if partList.count(node_part) != 1: 
+				if partList.count(node_part) != 1:
 					distance = False
 					break
 					# print('this cell contain more than one node, distance boolean false')
@@ -836,7 +842,7 @@ def calculate_dif_Inter_Inside(node, G, partList):
 
 	node_idx = list(G.nodes()).index(node)
 
-	print(node, partList, node_idx)
+	# print(node, partList, node_idx)
 	node_part = partList[node_idx]
 
 	# get neighbors of the given node in the whole graph
@@ -878,12 +884,13 @@ def get_nodes_tobe_locked(cell_met_const_tmp, partList_tmp, nodes_to_move, G_nod
 
 
 def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, maxNodes, populate_cell, populate_cell_rate, dist_boolean, motif_constraint, loop_free, priority, timestep, trajectories, outdir):
-	""" 
+	"""
 	optimize based on signal travel time from inputs to the output 
 	1. calculate the times that inputs have to traverse cell boundries 
-	2. optmize the max traverse to be as low as possible 
+	2. optmize the max traverse to be as low as possible
+	3. stop partitioning after 1 hour = 3600 seconds
 	"""
-
+	max_runtime = 1
 	Smin, Smax = int (S_bounds[0]), int (S_bounds[1])
 
 	in_nodes, out_nodes, nonprimitives  = get_nonprimitive_nodes (G)
@@ -900,8 +907,8 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	# calculate original signal traverse time
 	if priority == 'T':
 		T = calc_signal_path (G, in_nodes, out_nodes, partDict)
-		minT_o = max(T) 
-	else: 
+		minT_o = max(T)
+	else:
 		minT_o = 'NA'
 	# print(minT)
 	# get original partition matrix
@@ -921,7 +928,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 	if os.path.exists(outdir):
 		shutil.rmtree(outdir)
 		os.mkdir(outdir)
-	else: 
+	else:
 		os.mkdir(outdir)
 
 	if len(G_primitive.nodes()) <= Smax:
@@ -949,12 +956,11 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 		print('cells that dont meet constraint in original partition', cell_unmet_const)
 
 		last_updated = 0
+		begin_time_sample = time.time()
 		for t in range(1, int(timestep)):  # timestep
-			if t % 10000 == 0:
-				print(t)
 			# at each timestep, choose a swap that satisfies the gate number constraints of each cell
 			# print('original part dict', partDict)
-			print('bestpartList', bestpartList)
+			# print('bestpartList', bestpartList)
 
 			if priority == 'T' or (priority == 'C' and cell_unmet_const != []):
 				if t - last_updated <= int(timestep*0.5):
@@ -966,7 +972,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 					# # # # # # # # # # # # # # # # #
 
 					cell = find_cell_unmet_most_constraint(cell_unmet_const)
-					print(cell)
+					# print(cell)
 
 					# # # # # # # # # # # # # # # # #
 					# Ron-update: change randomly choose compartment to choose the compartment unmeet the most constraints
@@ -995,7 +1001,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 
 					# get all compartments in subG_cells that meet constraints, include the empty compartment
 					cell_unmet_subG, cell_met_subG = check_constraint_state_subG(subG_cells, cell_unmet_const)
-					print(cell_unmet_subG, cell_met_subG)
+					# print(cell_unmet_subG, cell_met_subG)
 
 					# # # # # # # # # # # # # # # # #
 					# Ron-update: Add new empty compartment into the sub-network without any prerequisites
@@ -1007,9 +1013,8 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 					# move one node from the chosen compartment into an empty new compartment.
 					t_part = 0
 					nodes_to_move = []
-					while part_constraint == False and t_part < 100:
+					while part_constraint == False and t_part < 100 and time.time() - begin_time_sample < max_runtime:
 						t_part += 1
-
 
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 						# Ron-update: from randomly choose nodes to choose nodes with heuristic
@@ -1043,13 +1048,13 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 						# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 						# Ron-update: Try to shift nodes
 						# # # # # # # # # # # # # # # # #
-						print('nodes to move', nodes_to_move)
+						# print('nodes to move', nodes_to_move)
 						for node in nodes_to_move:
-							print('move node', node)
+							# print('move node', node)
 							node_idx = list(G_nodes).index(node)
 							partList_tmp = move_node_to_compartment(cell_met_subG, partList_tmp, node_idx)
 
-						print("partList_tmp", partList_tmp)
+						# print("partList_tmp", partList_tmp)
 
 						# # # # # # # # # # # # # # # # #
 						# Ron-update: Try to shift nodes
@@ -1064,7 +1069,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 						min_part_size = min(collections.Counter(partList_tmp).values())
 
 						size_constraint = ( min_part_size >= Smin ) and ( max_part_size <= Smax )
-						print("check size constraint", size_constraint)
+						# print("check size constraint", size_constraint)
 
 						if size_constraint:
 
@@ -1091,7 +1096,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 						node_idx = list(G_nodes).index(node)
 						partList_tmp[node_idx] = new_empty_C
 
-					print("skip while")
+					# print("skip while")
 
 					# # # # # # # # # # # # # # # # #
 					# Ron-update: force to split one node in current compartment to the empty compartment after 100 attempts
@@ -1101,6 +1106,9 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 					# update current graph compartments, adj matrix for compartments after node shifting
 					subG_cells = [cell for cell in subG_cells if cell in partList_tmp]
 					matrix_new, partG_new = partition_matrix_update (G_primitive, bestmatrix, bestpartList, partList_tmp)
+					if time.time() - begin_time_sample > max_runtime:
+						print("Run time exceed!")
+						break
 
 					try:
 						subG_matrix_new, subG_partG_new = get_part_matrix_subG (matrix_new, partG_new, subG_cells)
@@ -1170,7 +1178,7 @@ def optimize_signal_subnetwork_tmp (G, primitive_only, S_bounds, cut, partDict, 
 								# update cell_unmet_const, cell_met_const after accepting the node shifting
 								cell_unmet_const, cell_met_const = ujson_copy (cell_unmet_const_tmp), ujson_copy (cell_met_const_tmp)
 								# cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
-								print('cells unmet constraint', cell_unmet_const)
+								# print('cells unmet constraint', cell_unmet_const)
 						bestT_list.append(minT_i)
 					except ValueError:
 						pass
@@ -1481,7 +1489,7 @@ def optimize_signal_subnetwork (G, primitive_only, S_bounds, cut, partDict, maxN
 
 
 def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxNodes, motif_constraint, outdir):
-	""" 
+	"""
 	optimize based on signal travel time from inputs to the output, search for all posible combinations
 	1. calculate the times that inputs have to traverse cell boundries 
 	2. optmize the max traverse to be as low as possible 
@@ -1498,7 +1506,7 @@ def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxN
 
 	# calculate original signal traverse time
 	T = calc_signal_path (G, in_nodes, out_nodes, partDict)
-	minT = max(T) 
+	minT = max(T)
 	# get original partition matrix
 	part_opt_o = [get_part(partDict, n) for n in G_primitive.nodes()]
 	matrix_o, partG_o = partition_matrix (G_primitive, part_opt_o)
@@ -1509,25 +1517,25 @@ def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxN
 	if os.path.exists(outdir):
 		shutil.rmtree(outdir)
 		os.mkdir(outdir)
-	else: 
+	else:
 		os.mkdir(outdir)
 
 	if minT > 0:
 		solN = 0
-		# store solutions 
+		# store solutions
 		f_out = open(outdir + 'part_solns.txt', 'w')
 
-		# choose nodes to move 
+		# choose nodes to move
 		nodes_to_move = generate_combinations (list(G_primitive.nodes()), range(1, maxNodes+1))
-		
-		# choose blocks to move to 
+
+		# choose blocks to move to
 		for nodescombo in nodes_to_move:
 			# print('nodes to move', nodescombo)
 			parts_to_move = [p for p in itertools.product(list(partDict.keys()), repeat=len(nodescombo))]   # permutation with repetition
 			# parts_to_move = itertools.permutations(partDict.keys(), len(nodescombo))                      # permutation without repetition
 
 			for partcombo in parts_to_move:
-				valid = True 
+				valid = True
 				# print('parts to move to', partcombo)
 				for idx, node_to_move in enumerate(nodescombo):
 					node_part = get_part (partDict, node_to_move)
@@ -1535,7 +1543,7 @@ def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxN
 					if node_part == partcombo[idx]:
 						valid = False
 						# print('invalid move')
-				if valid: 
+				if valid:
 					partDict_tmp = copy.deepcopy(partDict)
 					# print('original partdict', partDict_tmp)
 					for idx, node_to_move in enumerate(nodescombo):
@@ -1549,7 +1557,7 @@ def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxN
 						T = max (calc_signal_path(G, in_nodes, out_nodes, partDict_tmp))
 
 						C = cal_cut (G_primitive, partDict_tmp)
-						
+
 						# check if modules satisfy constraints
 						part_opt_format = [get_part(partDict_tmp, n) for n in G_primitive.nodes()]
 						matrix, partG = partition_matrix (G_primitive, part_opt_format)
@@ -1559,19 +1567,19 @@ def optimize_signal_bruteforce (G, primitive_only, S_bounds, cut, partDict, maxN
 						motif_allowed = check_motif_allowed(matrix, motif_constraint)
 
 						if loop_free and motif_allowed:
-							if T <= minT: 
+							if T <= minT:
 								solN += 1
 								f_out.write('sol\t'+str(solN)+'\n'+'T\t'+str(T)+'\n'+'cut\t'+str(C)+'\n')
 								for part in partDict_tmp.keys(): f_out.write('Partition '+str(part)+'\t'+','.join(partDict_tmp[part])+'\n')
-							else: 
+							else:
 								if not (motif_allowed_o and loop_free_o):
 									solN += 1
 									f_out.write('sol\t'+str(solN)+'\n'+'T\t'+str(T)+'\n'+'cut\t'+str(C)+'\n')
 									for part in partDict_tmp.keys(): f_out.write('Partition '+str(part)+'\t'+','.join(partDict_tmp[part])+'\n')
-							
+
 
 def choose_best_iteration (G, primitive_only, partDict, motif_constraint, loop_free, outdir):
-	""" 
+	"""
 	choose best iteration with minimal fraction of cells unmet constraint and lowest T
 	"""
 	in_nodes, out_nodes, nonprimitives  = get_nonprimitive_nodes (G)
@@ -1594,9 +1602,9 @@ def choose_best_iteration (G, primitive_only, partDict, motif_constraint, loop_f
 			R = len(cell_unmet_const)/int(npart)
 			print(iteration, solDict[iteration]['T'], R)
 			RDict[iteration] = R
-			if len(cell_unmet_const)/int(npart) < minR: 
+			if len(cell_unmet_const)/int(npart) < minR:
 				minR = len(cell_unmet_const)/int(npart)
-	
+
 	if RDict != {}:
 		bestiList = [i for i in RDict.keys() if RDict[i] == minR]
 		bestiTlist = [solDict[i]['T'] for i in bestiList]
@@ -1606,13 +1614,13 @@ def choose_best_iteration (G, primitive_only, partDict, motif_constraint, loop_f
 			besti = bestiList[0]
 		order = sorted(RDict, key=RDict.get)
 		result = [besti, order, solDict]
-	else: 
+	else:
 		result = []
 	return result
 
 
 def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes, motif_constraint, loop_free, priority, trajectories, outdir):
-	""" 
+	"""
 	for cells that dont meet constraint, splitting it n cells to see if it works 
 	"""
 	in_nodes, out_nodes, nonprimitives  = get_nonprimitive_nodes (G)
@@ -1625,11 +1633,11 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 	soln_found = False
 	# choose iteration result with the lowest ratio of cells unmet constraint
 	npart = len(partDict.keys())
-	if iteration == '': 
+	if iteration == '':
 		besti, order, solDict   = choose_best_iteration (G, primitive_only, partDict, motif_constraint, loop_free, outdir)
-	else: 
+	else:
 		solDict = load_opt_part_sol (outdir + 'part_solns.txt')
-	
+
 	part_opt      = [get_part(solDict[iteration]['part'], n) for n in G_primitive.nodes()]
 	T = calc_signal_path (G, in_nodes, out_nodes, partDict)
 
@@ -1639,7 +1647,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 	cell_unmet_const_o, cell_met_const_o = get_cells_unmet_constraint (matrix, partG, motif_constraint, loop_free)
 	print('cells unmet constraint at initial partition', cell_unmet_const_o)
 	cell_unmet_const = ujson_copy (cell_unmet_const_o)
-	
+
 	for t in range(5000):
 		size_constraint = False
 		while size_constraint == False:
@@ -1650,7 +1658,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 				nodesIdx = [idx for idx, element in enumerate(partList_tmp) if element == cell]
 				# print('idx of nodes in cell', nodesIdx)
 				S = partList_tmp.count(cell)
-				Nmax = int(S/int(S_bounds[0]))    # max number of sublists to split this list into 
+				Nmax = int(S/int(S_bounds[0]))    # max number of sublists to split this list into
 				ncell = 1  # partition this list into ncell lists
 				while ncell not in np.arange(3, Nmax):
 					ncell = np.random.poisson(2)
@@ -1659,7 +1667,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 				for node in nodesIdx:
 					new_part = random.choice(np.arange(ncell))
 					# print('new cell', new_part)
-					if new_part != 0: 
+					if new_part != 0:
 						partList_tmp[node] = npart + new_part - 1
 						# partList_tmp[list(G_primitive.nodes()).index(node)] = npart + new_part - 1
 						# print('changing partition of cell at index', node , 'to new part', npart + new_part - 1)
@@ -1674,8 +1682,8 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 		loop_free_new, motif_allowed_new = check_constraint (matrix_new, partG_new, motif_constraint)
 		cell_unmet_const_tmp, cell_met_const_tmp = get_cells_unmet_constraint (matrix_new, partG_new, motif_constraint, loop_free)
 
-		if len(cell_unmet_const_tmp) == 0 : 
-			# if found a solution with all cells satisfying the constraint, record the solution 
+		if len(cell_unmet_const_tmp) == 0 :
+			# if found a solution with all cells satisfying the constraint, record the solution
 			print('partList_tmp', partList_tmp)
 			bestpartDict = dict(zip(list(G_primitive.nodes()), partList_tmp))
 			bestpartDict = {part:[node for node in bestpartDict.keys() if bestpartDict[node] == part] for part in set(bestpartDict.values())}
@@ -1691,7 +1699,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 			print('visualize partition assignment')
 			# visualize_assignment_graphviz (G, partList_tmp, nonprimitives, primitive_only, outdir, int(trajectories)+1, [])
 			soln_found = True
-			break  
+			break
 
 		# if len(cell_unmet_const_tmp) <= len(cell_unmet_const):
 		# 	print(cell_unmet_const_tmp)
@@ -1713,7 +1721,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 	# # f_out.write('\n')
 	# # print('visualize partition assignment')
 	# # visualize_assignment_graphviz (G, partList_tmp, nonprimitives, primitive_only, outdir, len(solDict.keys())+1, cell_unmet_const)
-	
+
 	if soln_found: recorded_path = 1
 	else: recorded_path = 0
 	return soln_found, recorded_path
@@ -1722,7 +1730,7 @@ def split_cells (G, primitive_only, S_bounds, cut, partDict, iteration, maxNodes
 
 
 def determine_best_solution (G, primitive_only, high_constraint, low_constraint, outdir):
-	""" 
+	"""
 	from all solutions, choose the one(s) that satisfies motif constraints (prioritize high constraints, then low), 
 	while minimizing T (and cut)
 	"""
@@ -1759,6 +1767,7 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 					solDict = load_opt_part_sol (outdir+npart+'/optimized_'+constraint+'/part_solns.txt')
 					# print("solDict", solDict)
 					# check if motif_constraint is satisfied
+					print(1)
 					for iteration in solDict.keys():
 						# print('iteration', iteration)
 						# T = int(solDict[iteration]['T'])
@@ -1767,17 +1776,18 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 						T = max(calc_signal_path (G, in_nodes, out_nodes, part))
 						part_opt = (cut, [get_part(part, n) for n in G_primitive.nodes()])
 						matrix, partG = partition_matrix (G_primitive, part_opt[1])
-						loop_free, motif_allowed = check_constraint (matrix, partG, motif_constraint)	
+						loop_free, motif_allowed = check_constraint (matrix, partG, motif_constraint)
 						cell_unmet_const, cell_met_const = get_cells_unmet_constraint (matrix, partG, motif_constraint, 'TRUE')
 						# print('loop free & motif_allowed', loop_free, motif_allowed)
 						# print(cell_unmet_const)
 						# record solution if meeting constraints
-						# if motif_allowed and loop_free: 
+						# if motif_allowed and loop_free:
 						# 	f_out.write('\t'.join([str(npart), str(iteration), str(len(part.keys())), str(len(list(G.nodes()))), constraint, str(motif_allowed_o), str(motif_allowed), str(loop_free_o), str(loop_free), str(T_o), str(T), str(cut_o), str(cut)])+'\n')
-						
+
 						# print('loop free', loop_free)
 						# print('motif_allowed', motif_allowed)
 						# best soln so far
+						print(2)
 						matrix_bs, partG_bs = partition_matrix (G_primitive, best_soln[0][1][1])
 						loop_free_bs = check_cycles(partG_bs)
 						motif_allowed_bs = check_motif_allowed(matrix_bs, motif_constraint)
@@ -1793,10 +1803,10 @@ def determine_best_solution (G, primitive_only, high_constraint, low_constraint,
 									best_soln = [(iteration, part_opt)]
 									minT      = T
 								elif T == minT:
-									if cut < best_soln[0][1][0]: 
+									if cut < best_soln[0][1][0]:
 										best_soln = [(iteration, part_opt)]
 									elif cut == best_soln[0][1][0]:
-										best_soln.append((iteration, part_opt)) 
+										best_soln.append((iteration, part_opt))
 
 
 					# # # # # # # # # # # # # # # # #

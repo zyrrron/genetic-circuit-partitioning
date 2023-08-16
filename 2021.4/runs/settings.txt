@@ -2,6 +2,7 @@ sample	graph_path	lib_path	primitive_only	S_bounds	target_n	max_nodes_to_shift	h
 agc	./benchmark/agc-Digital-Automatic-Gain-Control/src/agc	./lib	TRUE	"1,5"		4	"2,2"	4	TRUE	C	1	./results/AutoGainC
 apollo	./benchmark/agc-guidance	./lib	TRUE	"1,5"		4	"2,2"	4	TRUE	C	1	./results/agc-guidance
 sha256	./benchmark/sha256-master/src/rtl/sha256	./lib	TRUE	"1,5"		4	"2,2"	4	TRUE	C	1	./results/sha256
+sha256_core	./benchmark/sha256-master/src/rtl/sha256_core	./lib	TRUE	"1,5"		4	"2,2"	4	TRUE	C	1	./results/sha256_core
 case1	./benchmark/bionetwork/lauren_group/case1	./lib	TRUE	"1,5"		4	"2,2"	4	TRUE	C	1	./results/bionetwork/lauren_group/case1
 case2	./benchmark/bionetwork/lauren_group/case2	./lib	TRUE	"1,7"		4	"2,2"	4	TRUE	C	1	./results/bionetwork/lauren_group/case2
 hexDisplay	./benchmark/electronic-circuits/hexDisplay	./lib	TRUE	"1,7"		5	"2,2"	4	TRUE	C	5	./results/electronic-circuits/hexDisplay
